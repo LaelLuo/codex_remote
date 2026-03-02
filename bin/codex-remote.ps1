@@ -21,6 +21,7 @@ else {
 }
 $script:AnchorDir = Join-Path $script:CodexRemoteHome "services/anchor"
 $script:AnchorBinary = Join-Path $script:AnchorDir "bin/codex-remote-anchor.exe"
+$script:AnchorSource = Join-Path $script:AnchorDir "src/index.ts"
 $script:EnvFile = Join-Path $script:CodexRemoteHome ".env"
 $script:CredentialsFile = if ($env:CODEX_REMOTE_CREDENTIALS_FILE) {
   $env:CODEX_REMOTE_CREDENTIALS_FILE
@@ -182,7 +183,7 @@ function Read-EnvFileMap([string]$Path) {
 
 function Assert-AnchorRuntime() {
   $hasBinary = Test-Path $script:AnchorBinary
-  $hasSource = Test-Path (Join-Path $script:AnchorDir "src/index.ts")
+  $hasSource = Test-Path $script:AnchorSource
 
   if (-not $hasBinary -and -not $hasSource) {
     throw "Anchor runtime not found. Expected binary at $script:AnchorBinary or source at $script:AnchorDir"
@@ -268,12 +269,17 @@ function Invoke-Anchor([bool]$ForceLogin) {
     New-Item -ItemType Directory -Path $credentialsDir -Force | Out-Null
   }
   $legacyCredentials = Join-Path $script:CodexRemoteHome "credentials.json"
-  if (
-    $legacyCredentials -ne $script:CredentialsFile -and
-    -not (Test-Path $script:CredentialsFile) -and
-    (Test-Path $legacyCredentials)
-  ) {
-    Copy-Item $legacyCredentials $script:CredentialsFile -Force
+  if ($legacyCredentials -ne $script:CredentialsFile -and (Test-Path $legacyCredentials)) {
+    if (-not (Test-Path $script:CredentialsFile)) {
+      Copy-Item $legacyCredentials $script:CredentialsFile -Force
+    }
+    else {
+      $legacyMtime = (Get-Item $legacyCredentials).LastWriteTimeUtc
+      $targetMtime = (Get-Item $script:CredentialsFile).LastWriteTimeUtc
+      if ($legacyMtime -gt $targetMtime) {
+        Copy-Item $legacyCredentials $script:CredentialsFile -Force
+      }
+    }
   }
 
   $envVars = Read-EnvFileMap $script:EnvFile
@@ -294,11 +300,14 @@ function Invoke-Anchor([bool]$ForceLogin) {
 
   $exitCode = 0
   try {
-    if (Test-Path $script:AnchorBinary) {
+    if ((Test-Path $script:AnchorSource) -and (Test-Tool "bun")) {
+      & bun "--env-file" $script:EnvFile $script:AnchorSource
+    }
+    elseif (Test-Path $script:AnchorBinary) {
       & $script:AnchorBinary
     }
     else {
-      & bun "--env-file" $script:EnvFile (Join-Path $script:AnchorDir "src/index.ts")
+      & bun "--env-file" $script:EnvFile $script:AnchorSource
     }
     $exitCode = $LASTEXITCODE
   }

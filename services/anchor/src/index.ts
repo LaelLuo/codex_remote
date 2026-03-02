@@ -2176,7 +2176,20 @@ async function startup() {
   }
 
   if (ORBIT_URL) {
-    const preflight = await preflightOrbitConnection();
+    let preflight = await preflightOrbitConnection();
+    if (!preflight.ok && preflight.kind === "auth" && ANCHOR_REFRESH_TOKEN) {
+      const refreshed = await refreshAnchorAccessToken();
+      if (refreshed) {
+        preflight = await preflightOrbitConnection();
+      }
+    }
+    if (!preflight.ok && preflight.kind === "auth" && !FORCE_LOGIN) {
+      console.warn("[anchor] Orbit rejected cached credentials; starting device re-auth.");
+      const reAuthOk = await deviceLogin();
+      if (reAuthOk) {
+        preflight = await preflightOrbitConnection();
+      }
+    }
     if (!preflight.ok) {
       if (preflight.kind === "auth") {
         console.error(`[anchor] Orbit authentication failed: ${preflight.detail}`);
