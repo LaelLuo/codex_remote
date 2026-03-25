@@ -2,6 +2,7 @@
   import { createEventDispatcher } from "svelte";
   import { socket } from "../socket.svelte";
   import { worktrees } from "../worktrees.svelte";
+  import { i18n } from "../i18n.svelte";
 
   type Step = "project" | "worktree";
   const SEARCH_START_STORAGE_KEY = "codex_remote_worktree_search_start";
@@ -97,7 +98,7 @@
       roots = result.roots ?? [];
     } catch (err) {
       if (requestId !== browseRequestId) return;
-      browseError = err instanceof Error ? err.message : "Failed to list directories";
+      browseError = err instanceof Error ? err.message : i18n.t("worktreeModal.error.listDirsFailed");
       dirs = [];
     } finally {
       if (requestId !== browseRequestId) return;
@@ -170,9 +171,9 @@
       if (path) {
         newWorktreePath = "";
       }
-      actionMessage = "Created worktree";
+      actionMessage = i18n.t("worktreeModal.action.createdWorktree");
     } catch (err) {
-      actionError = err instanceof Error ? err.message : "Failed to create worktree";
+      actionError = err instanceof Error ? err.message : i18n.t("worktreeModal.error.createWorktreeFailed");
     }
   }
 
@@ -220,7 +221,7 @@
 <svelte:window onkeydown={handleWindowKeydown} />
 
 {#if open}
-  <button type="button" class="modal-backdrop" aria-label="Close" onclick={closeModal}></button>
+  <button type="button" class="modal-backdrop" aria-label={i18n.t("worktreeModal.close")} onclick={closeModal}></button>
   <div class="modal" role="dialog" aria-modal="true" tabindex="-1">
     <div class="modal-header split">
       <div class="step-indicators row">
@@ -230,7 +231,7 @@
           class:active={step === "project"}
           onclick={goBack}
         >
-          Project
+          {i18n.t("worktreeModal.project")}
         </button>
         <span class="step-arrow">›</span>
         <button
@@ -240,7 +241,7 @@
           disabled={!canNext}
           onclick={goNext}
         >
-          Worktree
+          {i18n.t("worktreeModal.worktree")}
         </button>
       </div>
       <button type="button" class="modal-close" onclick={closeModal}>×</button>
@@ -249,7 +250,7 @@
     <div class="modal-body stack">
       {#if step === "project"}
         <div class="path-tools stack">
-          <label class="path-label" for="search-start-input">Search start directory</label>
+          <label class="path-label" for="search-start-input">{i18n.t("worktreeModal.searchStartDirectory")}</label>
           <div class="path-input-row row">
             <input
               id="search-start-input"
@@ -258,8 +259,8 @@
               bind:value={searchStartPath}
               placeholder="C:\\Projects or /Users/name/projects"
             />
-            <button type="button" class="tiny-btn" onclick={openSearchStart}>Open</button>
-            <button type="button" class="tiny-btn" onclick={setSearchStartFromCurrent}>Use current</button>
+            <button type="button" class="tiny-btn" onclick={openSearchStart}>{i18n.t("worktreeModal.open")}</button>
+            <button type="button" class="tiny-btn" onclick={setSearchStartFromCurrent}>{i18n.t("worktreeModal.useCurrent")}</button>
           </div>
           {#if roots.length > 0}
             <div class="roots row">
@@ -274,11 +275,11 @@
           <div class="dir-header">
             <span class="dir-path" title={currentPath}>{currentPath || "/"}</span>
             {#if worktrees.loading}
-              <span class="dir-hint">inspecting...</span>
+              <span class="dir-hint">{i18n.t("worktreeModal.inspecting")}</span>
             {/if}
           </div>
           {#if browseLoading}
-            <div class="dir-status">Loading...</div>
+            <div class="dir-status">{i18n.t("worktreeModal.loading")}</div>
           {:else if browseError}
             <div class="dir-status dir-error">{browseError}</div>
           {:else}
@@ -296,21 +297,21 @@
                 </li>
               {/each}
               {#if dirs.length === 0}
-                <li class="dir-status">No subdirectories</li>
+                <li class="dir-status">{i18n.t("worktreeModal.noSubdirectories")}</li>
               {/if}
             </ul>
           {/if}
         </div>
 
         {#if worktrees.isGitRepo}
-          <div class="status-msg status-ok">Git repository detected</div>
+          <div class="status-msg status-ok">{i18n.t("worktreeModal.gitRepositoryDetected")}</div>
         {/if}
       {:else}
         {#if worktrees.loading}
-          <div class="status-msg">Loading...</div>
+          <div class="status-msg">{i18n.t("worktreeModal.loading")}</div>
         {:else}
           <div class="path-tools stack">
-            <label class="path-label" for="worktree-root-input">New worktree root (optional)</label>
+            <label class="path-label" for="worktree-root-input">{i18n.t("worktreeModal.newWorktreeRootOptional")}</label>
             <div class="path-input-row row">
               <input
                 id="worktree-root-input"
@@ -319,9 +320,9 @@
                 bind:value={worktreeRootDir}
                 placeholder="D:\\codex-worktrees or /Volumes/worktrees"
               />
-              <button type="button" class="tiny-btn" onclick={setWorktreeRootFromCurrent}>Use current</button>
+              <button type="button" class="tiny-btn" onclick={setWorktreeRootFromCurrent}>{i18n.t("worktreeModal.useCurrent")}</button>
             </div>
-            <label class="path-label" for="worktree-path-input">Exact new worktree path (optional)</label>
+            <label class="path-label" for="worktree-path-input">{i18n.t("worktreeModal.exactNewWorktreePathOptional")}</label>
             <input
               id="worktree-path-input"
               class="path-input"
@@ -339,7 +340,7 @@
                   class="worktree-select"
                   onclick={() => worktrees.select(wt.path)}
                 >
-                  <span class="worktree-branch">{wt.branch || "detached"}</span>
+                  <span class="worktree-branch">{wt.branch || i18n.t("worktreeModal.detached")}</span>
                   <span class="worktree-path" title={wt.path}>{wt.path}</span>
                 </button>
               </li>
@@ -347,7 +348,7 @@
           </ul>
 
           <button type="button" class="small-btn" onclick={createWorktree} disabled={worktrees.mutating}>
-            + New from HEAD
+            {i18n.t("worktreeModal.newFromHead")}
           </button>
         {/if}
       {/if}
@@ -361,22 +362,22 @@
     </div>
 
     <div class="modal-footer split">
-      <button type="button" class="cancel-btn" onclick={closeModal}>Cancel</button>
+      <button type="button" class="cancel-btn" onclick={closeModal}>{i18n.t("worktreeModal.cancel")}</button>
       <div class="row footer-actions">
         {#if step === "project"}
           {#if canNext}
             <button type="button" class="confirm-btn" onclick={goNext}>
-              Next
+              {i18n.t("worktreeModal.next")}
             </button>
           {:else}
             <button type="button" class="confirm-btn" onclick={confirmSelection} disabled={!canSelect}>
-              Select
+              {i18n.t("worktreeModal.select")}
             </button>
           {/if}
         {:else}
-          <button type="button" class="back-btn" onclick={goBack}>Back</button>
+          <button type="button" class="back-btn" onclick={goBack}>{i18n.t("worktreeModal.back")}</button>
           <button type="button" class="confirm-btn" onclick={confirmSelection} disabled={!canSelect}>
-            Select
+            {i18n.t("worktreeModal.select")}
           </button>
         {/if}
       </div>

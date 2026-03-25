@@ -1,5 +1,6 @@
 <script lang="ts">
   import { socket } from "../socket.svelte";
+  import { i18n } from "../i18n.svelte";
 
   interface Props {
     value: string;
@@ -26,7 +27,7 @@
       parentPath = result.parent;
       browsing = true;
     } catch (err) {
-      browseError = err instanceof Error ? err.message : "Failed to list directories";
+      browseError = err instanceof Error ? err.message : i18n.t("projectPicker.error.listDirsFailed");
       dirs = [];
     } finally {
       loading = false;
@@ -76,7 +77,7 @@
       class="browse-btn"
       disabled={socket.status !== "connected"}
       onclick={() => browsing ? closeBrowser() : browse(value || undefined)}
-      title={browsing ? "Close browser" : "Browse directories"}
+      title={browsing ? i18n.t("projectPicker.closeBrowser") : i18n.t("projectPicker.browseDirectories")}
     >{browsing ? "×" : "…"}</button>
   </div>
 
@@ -84,10 +85,10 @@
     <div class="dir-browser">
       <div class="dir-header">
         <span class="dir-path" title={currentPath}>{currentPath}</span>
-        <button type="button" class="select-btn" onclick={selectCurrent}>Select</button>
+        <button type="button" class="select-btn" onclick={selectCurrent}>{i18n.t("projectPicker.select")}</button>
       </div>
       {#if loading}
-        <div class="dir-loading">Loading...</div>
+        <div class="dir-loading">{i18n.t("projectPicker.loading")}</div>
       {:else if browseError}
         <div class="dir-error">{browseError}</div>
       {:else}
@@ -105,7 +106,7 @@
             </li>
           {/each}
           {#if dirs.length === 0}
-            <li class="dir-empty">No subdirectories</li>
+            <li class="dir-empty">{i18n.t("projectPicker.noSubdirectories")}</li>
           {/if}
         </ul>
       {/if}

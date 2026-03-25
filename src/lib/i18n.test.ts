@@ -159,4 +159,18 @@ describe("i18n store", () => {
     i18n.set("zh-CN");
     expect(i18n.t("tool.title.review")).toBe("审查");
   });
+
+  test("translates project picker and worktree modal labels", async () => {
+    const { i18n } = await loadI18n();
+    expect(i18n.t("projectPicker.browseDirectories")).toBe("Browse directories");
+    expect(i18n.t("projectPicker.noSubdirectories")).toBe("No subdirectories");
+    expect(i18n.t("worktreeModal.searchStartDirectory")).toBe("Search start directory");
+    expect(i18n.t("worktreeModal.gitRepositoryDetected")).toBe("Git repository detected");
+
+    i18n.set("zh-CN");
+    expect(i18n.t("projectPicker.browseDirectories")).toBe("浏览目录");
+    expect(i18n.t("projectPicker.noSubdirectories")).toBe("没有子目录");
+    expect(i18n.t("worktreeModal.searchStartDirectory")).toBe("搜索起始目录");
+    expect(i18n.t("worktreeModal.gitRepositoryDetected")).toBe("检测到 Git 仓库");
+  });
 });

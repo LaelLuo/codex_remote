@@ -6,3 +6,5 @@
 - 2026-03-25T11:26:12.000Z [agent] 第二阶段实现进行中：已完成 Thread/Device 与线程相关组件（ApprovalPrompt/UserInputPrompt/PromptInput/GitStatusPanel/ArtifactsTimeline/PlanCard/WorkingStatus/MessageBlock/Tool）首批可见文案本地化，`GitStatusPanel`/`Tool` 内部提示改为 key/text descriptor 渲染；新增 i18n 二阶段断言并通过指定验证命令。
 - 2026-03-25T11:30:37.000Z [agent] 根据 review findings 返修：修复 `GitStatusPanel` commit+push 合成消息 descriptor 退化问题；本地化 Thread 页 mode/sandbox 显示值与 PromptInput 的 Img 按钮；并将 `tool.title.agent` 中文化为“智能体”。
 - 2026-03-25T19:41:00.4388268+08:00 [agent] 第二阶段已通过实现子代理返修、review 子代理复审与人工复查，准备提交 Thread/Device 与线程组件中文化改动，并继续推进第三阶段剩余辅助界面文案。
+- 2026-03-25T11:48:04.000Z [agent] 第三阶段完成首批辅助组件：`ProjectPicker` 与 `WorktreeModal` 可见文案接入 i18n（含 Browse/Close/Select/Loading/No subdirectories 与 Worktree 相关按钮/标签/状态文案），补充 i18n 测试并通过 lint。
+- 2026-03-25T19:53:28.1654606+08:00 [agent] 第三阶段已通过 review 子代理复审与人工复查，准备提交 `ProjectPicker` / `WorktreeModal` 中文化改动，并继续盘点剩余品牌/辅助可见英文与边界外错误文案。
