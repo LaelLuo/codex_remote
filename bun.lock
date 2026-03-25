@@ -9,6 +9,7 @@
         "@simplewebauthn/browser": "^11.0.0",
         "dompurify": "^3.3.1",
         "highlight.js": "^11.11.1",
+        "js-yaml": "^4.1.1",
         "marked": "^17.0.1",
         "qrcode": "^1.5.4",
         "sv-router": "^0.13.0",

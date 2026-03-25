@@ -7,6 +7,7 @@
     "dev:all": "bun --env-file .env bin/dev-local.ts",
     "build": "bunx --bun vite build",
     "lint": "bunx eslint .",
+    "task": "bun scripts/task-cli.ts",
     "typecheck": "bunx tsc -p tsconfig.json --noEmit && bunx tsc -p services/anchor/tsconfig.json --noEmit && bunx tsc -p services/orbit/tsconfig.json --noEmit",
     "test": "bun test src/lib/**/*.test.ts && python -m pytest -q services/control-plane/tests && bun --cwd services/orbit test",
     "ci:local": "bun run lint && bun run typecheck && bun run test && bun --env-file .env.example run build",
@@ -22,11 +23,12 @@
   },
   "dependencies": {
     "@pierre/diffs": "^1.0.6",
-    "qrcode": "^1.5.4",
     "@simplewebauthn/browser": "^11.0.0",
     "dompurify": "^3.3.1",
     "highlight.js": "^11.11.1",
+    "js-yaml": "^4.1.1",
     "marked": "^17.0.1",
+    "qrcode": "^1.5.4",
     "sv-router": "^0.13.0",
     "svelte": "^5.0.0"
   },
