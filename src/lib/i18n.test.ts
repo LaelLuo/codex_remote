@@ -189,4 +189,22 @@ describe("i18n store", () => {
     expect(i18n.t("socket.error.invalidUrl", { url: "bad" })).toBe("无效 URL：bad");
     expect(i18n.t("socket.error.rpc")).toBe("RPC 错误");
   });
+
+  test("translates thread start fallback labels", async () => {
+    const { i18n } = await loadI18n();
+    expect(i18n.t("threads.error.failedToStartThread")).toBe("Failed to start thread");
+    expect(i18n.t("threads.error.noDevicesConnected")).toBe("No devices are connected.");
+    expect(i18n.t("threads.error.selectDeviceBeforeSession")).toBe(
+      "Select a device in Settings before creating a session.",
+    );
+    expect(i18n.t("threads.error.selectedDeviceOffline")).toBe(
+      "Selected device is offline. Choose another device in Settings.",
+    );
+
+    i18n.set("zh-CN");
+    expect(i18n.t("threads.error.failedToStartThread")).toBe("启动线程失败");
+    expect(i18n.t("threads.error.noDevicesConnected")).toBe("当前没有已连接设备。");
+    expect(i18n.t("threads.error.selectDeviceBeforeSession")).toBe("创建会话前请先在设置中选择设备。");
+    expect(i18n.t("threads.error.selectedDeviceOffline")).toBe("所选设备离线，请在设置中选择其他设备。");
+  });
 });

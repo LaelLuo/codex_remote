@@ -1,8 +1,8 @@
 <script lang="ts">
   import { socket } from "../lib/socket.svelte";
-  import { threads } from "../lib/threads.svelte";
+  import { getThreadStartErrorMessage, threads } from "../lib/threads.svelte";
   import { messages } from "../lib/messages.svelte";
-  import { i18n } from "../lib/i18n.svelte";
+  import { i18n, type TranslationParams } from "../lib/i18n.svelte";
   import { theme } from "../lib/theme.svelte";
   import { models } from "../lib/models.svelte";
   import { anchors } from "../lib/anchors.svelte";
@@ -32,6 +32,9 @@
   const MAX_PANES = 8;
 
   type PaneCount = (typeof PANE_COUNT_OPTIONS)[number];
+  type UiMessage =
+    | { kind: "key"; key: string; params?: TranslationParams }
+    | { kind: "text"; text: string };
 
   interface ComposerPane {
     id: number;
@@ -45,7 +48,7 @@
     selectedModel: string;
     isCreating: boolean;
     pendingStartToken: number | null;
-    submitError: string | null;
+    submitError: UiMessage | null;
   }
 
   const recentThreads = $derived(threads.list.slice(0, RECENT_LIMIT));
@@ -56,6 +59,32 @@
     if (!socket.error) return "";
     if (socket.error.kind === "text") return socket.error.text;
     return i18n.t(socket.error.key, socket.error.params);
+  }
+
+  function messageKey(key: string, params?: TranslationParams): UiMessage {
+    return { kind: "key", key, ...(params ? { params } : {}) };
+  }
+
+  function messageText(text: string): UiMessage {
+    return { kind: "text", text };
+  }
+
+  function renderMessage(message: UiMessage | null): string {
+    if (!message) return "";
+    if (message.kind === "text") return message.text;
+    return i18n.t(message.key, message.params);
+  }
+
+  function errorToUiMessage(error: unknown, fallbackKey: string): UiMessage {
+    const threadStartError = getThreadStartErrorMessage(error);
+    if (threadStartError) {
+      return threadStartError.kind === "text"
+        ? messageText(threadStartError.text)
+        : messageKey(threadStartError.key, threadStartError.params);
+    }
+    if (error instanceof Error && error.message.trim()) return messageText(error.message);
+    if (typeof error === "string" && error.trim()) return messageText(error);
+    return messageKey(fallbackKey);
   }
 
   let paneCount = $state<PaneCount>(1);
@@ -155,17 +184,17 @@
     targetThreadId: string,
     inputText: string,
     imageInputs: TurnImageInput[] = [],
-  ): string | null {
+  ): UiMessage | null {
     const pane = getPane(paneId);
-    if (!pane) return i18n.t("home.submitError.paneNotFound");
+    if (!pane) return messageKey("home.submitError.paneNotFound");
 
     const input = buildTurnInputItems(inputText, imageInputs);
-    if (input.length === 0) return i18n.t("home.submitError.inputEmpty");
+    if (input.length === 0) return messageKey("home.submitError.inputEmpty");
 
     const selectedAnchorId = !auth.isLocalMode ? anchors.selectedId : null;
     if (!auth.isLocalMode) {
-      if (!selectedAnchorId) return i18n.t("home.submitError.selectDeviceBeforeSend");
-      if (!anchors.selected) return i18n.t("home.submitError.selectedDeviceOffline");
+      if (!selectedAnchorId) return messageKey("home.submitError.selectDeviceBeforeSend");
+      if (!anchors.selected) return messageKey("home.submitError.selectedDeviceOffline");
     }
 
     const params: Record<string, unknown> = {
@@ -187,7 +216,9 @@
       params,
     });
 
-    return result.success ? null : result.error ?? i18n.t("home.submitError.sendFailed");
+    if (result.success) return null;
+    if (result.error) return messageText(result.error);
+    return messageKey("home.submitError.sendFailed");
   }
 
   function handlePanePlanApprove(paneId: number, messageId: string) {
@@ -201,14 +232,14 @@
     }
   }
 
-  function submitToExistingThread(paneId: number, rawInput: string, imageInputs: TurnImageInput[] = []): string | null {
+  function submitToExistingThread(paneId: number, rawInput: string, imageInputs: TurnImageInput[] = []): UiMessage | null {
     const pane = getPane(paneId);
-    if (!pane?.threadId) return i18n.t("home.submitError.sessionNotStarted");
+    if (!pane?.threadId) return messageKey("home.submitError.sessionNotStarted");
 
     const normalizedInput = rawInput.trim();
-    if (!normalizedInput && imageInputs.length === 0) return i18n.t("home.submitError.inputEmpty");
+    if (!normalizedInput && imageInputs.length === 0) return messageKey("home.submitError.inputEmpty");
     if (imageInputs.length > 0 && (normalizedInput.startsWith("/u") || normalizedInput.startsWith("!"))) {
-      return i18n.t("home.submitError.imagesNormalOnly");
+      return messageKey("home.submitError.imagesNormalOnly");
     }
 
     const ulwCommand = parseUlwCommand(normalizedInput);
@@ -228,7 +259,7 @@
         typeof ulwCommand.maxIterations !== "number" &&
         !ulwCommand.completionPromise
       ) {
-        return i18n.t("home.submitError.ulwConfigUsage");
+        return messageKey("home.submitError.ulwConfigUsage");
       }
       ulwRuntime.configure(pane.threadId, {
         maxIterations: ulwCommand.maxIterations,
@@ -240,7 +271,7 @@
     if (ulwCommand?.kind === "start") {
       const task =
         ulwCommand.task ?? pickUlwTaskFromMessages(messages.getThreadMessages(pane.threadId));
-      if (!task) return i18n.t("home.submitError.addTaskAfterU");
+      if (!task) return messageKey("home.submitError.addTaskAfterU");
       ulwLoopRunner.start(
         pane.threadId,
         {
@@ -256,7 +287,7 @@
     const bangCommand = parseBangTerminalCommand(normalizedInput);
     if (bangCommand) {
       if (!bangCommand.command) {
-        return i18n.t("home.submitError.bangUsage");
+        return messageKey("home.submitError.bangUsage");
       }
       if (ulwRuntime.isActive(pane.threadId)) {
         ulwLoopRunner.stop(pane.threadId, "manual_user_input");
@@ -276,7 +307,10 @@
     ulwLoopRunner.stop(pane.threadId, "user_interrupt");
     const result = messages.interrupt(pane.threadId);
     if (!result.success) {
-      updatePane(paneId, { submitError: result.error ?? i18n.t("home.submitError.stopTurnFailed") });
+      updatePane(
+        paneId,
+        { submitError: result.error ? messageText(result.error) : messageKey("home.submitError.stopTurnFailed") },
+      );
     }
   }
 
@@ -346,7 +380,7 @@
       updatePane(paneId, { terminalAttachments: [...pane.terminalAttachments, ...result.images], submitError: null });
     }
     if (result.errors.length > 0) {
-      updatePane(paneId, { submitError: result.errors.join(" ") });
+      updatePane(paneId, { submitError: messageText(result.errors.join(" ")) });
     }
   }
 
@@ -431,19 +465,19 @@
     const ulwCommand = parseUlwCommand(rawInput);
     const bangCommand = ulwCommand ? null : parseBangTerminalCommand(rawInput);
     if (ulwCommand?.kind === "stop") {
-      updatePane(paneId, { submitError: i18n.t("home.submitError.useStopInsideTerminal") });
+      updatePane(paneId, { submitError: messageKey("home.submitError.useStopInsideTerminal") });
       return;
     }
     if (ulwCommand?.kind === "config") {
-      updatePane(paneId, { submitError: i18n.t("home.submitError.startWindowFirstThenConfig") });
+      updatePane(paneId, { submitError: messageKey("home.submitError.startWindowFirstThenConfig") });
       return;
     }
     if (bangCommand && !bangCommand.command) {
-      updatePane(paneId, { submitError: i18n.t("home.submitError.bangUsage") });
+      updatePane(paneId, { submitError: messageKey("home.submitError.bangUsage") });
       return;
     }
     if (pane.taskAttachments.length > 0 && (ulwCommand || bangCommand)) {
-      updatePane(paneId, { submitError: i18n.t("home.submitError.imagesNormalOnly") });
+      updatePane(paneId, { submitError: messageKey("home.submitError.imagesNormalOnly") });
       return;
     }
 
@@ -475,7 +509,7 @@
           if (ulwCommand?.kind === "start") {
             updatePane(paneId, { task: "", taskAttachments: [] });
             if (!ulwCommand.task) {
-              updatePane(paneId, { submitError: i18n.t("home.submitError.addTaskAfterULaunchHome") });
+              updatePane(paneId, { submitError: messageKey("home.submitError.addTaskAfterULaunchHome") });
               return;
             }
             const loopDeps = {
@@ -504,14 +538,14 @@
           }
         },
         onThreadStartFailed: (error) => {
-          updatePane(paneId, { submitError: error.message || i18n.t("home.submitError.failedToCreateTask") });
+          updatePane(paneId, { submitError: errorToUiMessage(error, "home.submitError.failedToCreateTask") });
           clearPendingStart(paneId, token);
         },
       });
     } catch (err) {
       console.error("Failed to create task:", err);
       updatePane(paneId, {
-        submitError: err instanceof Error ? err.message : i18n.t("home.submitError.failedToCreateTask"),
+        submitError: errorToUiMessage(err, "home.submitError.failedToCreateTask"),
       });
       clearPendingStart(paneId, token);
     }
@@ -617,7 +651,7 @@
               {#if pane.submitError}
                 <div class="error pane-error row">
                   <span class="error-icon">!</span>
-                  <span class="error-text">{pane.submitError}</span>
+                  <span class="error-text">{renderMessage(pane.submitError)}</span>
                 </div>
               {/if}
 

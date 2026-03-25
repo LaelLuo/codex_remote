@@ -26,11 +26,17 @@ const configStub: ConfigStoreStub = {
 const originalFetch = globalThis.fetch;
 const originalAuthStore = globalStore[AUTH_STORE_KEY];
 const originalConfigStore = globalStore[CONFIG_STORE_KEY];
+const originalStateDescriptor = Object.getOwnPropertyDescriptor(globalThis, "$state");
 
 let api: typeof import("./api").api;
 let ApiError: typeof import("./api").ApiError;
 
 beforeAll(async () => {
+  Object.defineProperty(globalThis, "$state", {
+    configurable: true,
+    writable: true,
+    value: <T>(value: T) => value,
+  });
   globalStore[AUTH_STORE_KEY] = authStub;
   globalStore[CONFIG_STORE_KEY] = configStub;
 
@@ -58,6 +64,12 @@ afterAll(() => {
     delete globalStore[CONFIG_STORE_KEY];
   } else {
     globalStore[CONFIG_STORE_KEY] = originalConfigStore;
+  }
+
+  if (originalStateDescriptor) {
+    Object.defineProperty(globalThis, "$state", originalStateDescriptor);
+  } else {
+    delete (globalThis as Record<string, unknown>).$state;
   }
 });
 

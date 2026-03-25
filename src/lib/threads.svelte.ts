@@ -17,6 +17,25 @@ const DEFAULT_SETTINGS: ThreadSettings = {
   mode: "code",
 };
 
+export type ThreadStartMessage =
+  | { kind: "key"; key: string; params?: Record<string, string | number> }
+  | { kind: "text"; text: string };
+
+export class ThreadStartError extends Error {
+  readonly uiMessage: ThreadStartMessage;
+
+  constructor(uiMessage: ThreadStartMessage, fallbackMessage?: string) {
+    super(fallbackMessage ?? (uiMessage.kind === "text" ? uiMessage.text : uiMessage.key));
+    this.name = "ThreadStartError";
+    this.uiMessage = uiMessage;
+  }
+}
+
+export function getThreadStartErrorMessage(error: unknown): ThreadStartMessage | null {
+  if (error instanceof ThreadStartError) return error.uiMessage;
+  return null;
+}
+
 interface PendingStart {
   cwd: string | null;
   input: string | null;
@@ -326,8 +345,8 @@ class ThreadsStore {
         onThreadStarted: options?.onThreadStarted ?? null,
         onThreadStartFailed: options?.onThreadStartFailed ?? null,
       };
-      this.#handleStartFailure({ message }, pending);
-      throw new Error(message);
+      this.#handleStartFailure(message, pending);
+      throw new ThreadStartError(message, this.#messageToFallbackText(message));
     }
 
     const requestedModel = this.#resolveStartModel(options?.collaborationMode);
@@ -357,9 +376,11 @@ class ThreadsStore {
     if (!sendResult.success) {
       this.#pendingRequests.delete(id);
       this.#pendingStarts.delete(id);
-      const message = sendResult.error ?? "Failed to start thread";
-      this.#handleStartFailure({ message }, pending);
-      throw new Error(message);
+      const message: ThreadStartMessage = sendResult.error
+        ? { kind: "text", text: sendResult.error }
+        : { kind: "key", key: "threads.error.failedToStartThread" };
+      this.#handleStartFailure(message, pending);
+      throw new ThreadStartError(message, this.#messageToFallbackText(message));
     }
   }
 
@@ -372,7 +393,7 @@ class ThreadsStore {
   #handleStartFailure(error: unknown, pending: PendingStart | null) {
     const message = this.#getErrorMessage(error);
     if (pending?.onThreadStartFailed) {
-      pending.onThreadStartFailed(new Error(message));
+      pending.onThreadStartFailed(new ThreadStartError(message, this.#messageToFallbackText(message)));
     }
   }
 
@@ -383,22 +404,44 @@ class ThreadsStore {
     return anchors.selected?.id ?? null;
   }
 
-  #getAnchorErrorMessage(): string {
-    if (auth.isLocalMode) return "Failed to start thread";
-    if (anchors.list.length === 0) return "No devices are connected.";
-    if (!anchors.selectedId) return "Select a device in Settings before creating a session.";
-    if (!anchors.selected) return "Selected device is offline. Choose another device in Settings.";
-    return "Failed to start thread";
+  #getAnchorErrorMessage(): ThreadStartMessage {
+    if (auth.isLocalMode) return { kind: "key", key: "threads.error.failedToStartThread" };
+    if (anchors.list.length === 0) return { kind: "key", key: "threads.error.noDevicesConnected" };
+    if (!anchors.selectedId) return { kind: "key", key: "threads.error.selectDeviceBeforeSession" };
+    if (!anchors.selected) return { kind: "key", key: "threads.error.selectedDeviceOffline" };
+    return { kind: "key", key: "threads.error.failedToStartThread" };
   }
 
-  #getErrorMessage(error: unknown): string {
-    if (error instanceof Error && error.message.trim()) return error.message;
-    if (typeof error === "string" && error.trim()) return error;
+  #getErrorMessage(error: unknown): ThreadStartMessage {
+    if (error instanceof ThreadStartError) return error.uiMessage;
+    if (error && typeof error === "object") {
+      const candidate = error as Record<string, unknown>;
+      if (candidate.kind === "key" && typeof candidate.key === "string") {
+        const params = candidate.params;
+        return {
+          kind: "key",
+          key: candidate.key,
+          ...(params && typeof params === "object"
+            ? { params: params as Record<string, string | number> }
+            : {}),
+        };
+      }
+      if (candidate.kind === "text" && typeof candidate.text === "string") {
+        return { kind: "text", text: candidate.text };
+      }
+    }
+    if (error instanceof Error && error.message.trim()) return { kind: "text", text: error.message };
+    if (typeof error === "string" && error.trim()) return { kind: "text", text: error };
     if (error && typeof error === "object") {
       const message = (error as { message?: unknown }).message;
-      if (typeof message === "string" && message.trim()) return message;
+      if (typeof message === "string" && message.trim()) return { kind: "text", text: message };
     }
-    return "Failed to start thread";
+    return { kind: "key", key: "threads.error.failedToStartThread" };
+  }
+
+  #messageToFallbackText(message: ThreadStartMessage): string {
+    if (message.kind === "text") return message.text;
+    return message.key;
   }
 
   #loadSettings() {

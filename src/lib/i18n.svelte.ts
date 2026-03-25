@@ -279,6 +279,10 @@ const en: MessageDict = {
   "thread.error.addTaskAfterU": "Add a task after /u, or send a normal task message first.",
   "thread.error.bangUsage": "Usage: !<command> or !pwsh|cmd|bash|sh|zsh|fish <command>",
   "thread.error.stopTurnFailed": "Failed to stop turn",
+  "threads.error.failedToStartThread": "Failed to start thread",
+  "threads.error.noDevicesConnected": "No devices are connected.",
+  "threads.error.selectDeviceBeforeSession": "Select a device in Settings before creating a session.",
+  "threads.error.selectedDeviceOffline": "Selected device is offline. Choose another device in Settings.",
 
   "approval.header": "Approval Required",
   "approval.action.command": "Run shell command",
@@ -718,6 +722,10 @@ const zhCN: MessageDict = {
   "thread.error.addTaskAfterU": "请在 /u 后补充任务，或先发送普通任务消息。",
   "thread.error.bangUsage": "用法：!<command> 或 !pwsh|cmd|bash|sh|zsh|fish <command>",
   "thread.error.stopTurnFailed": "停止当前轮次失败",
+  "threads.error.failedToStartThread": "启动线程失败",
+  "threads.error.noDevicesConnected": "当前没有已连接设备。",
+  "threads.error.selectDeviceBeforeSession": "创建会话前请先在设置中选择设备。",
+  "threads.error.selectedDeviceOffline": "所选设备离线，请在设置中选择其他设备。",
 
   "approval.header": "需要审批",
   "approval.action.command": "运行 Shell 命令",

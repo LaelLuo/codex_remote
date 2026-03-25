@@ -2,12 +2,19 @@
 
 ## Open
 
-- NA-1774450837000 下一轮聚焦 threads 启动失败与剩余 submitError 路径的 descriptor/key 改造，收敛跨页面错误文案一致性。
+- NA-1774452873000 下一轮聚焦 `socket.send` / `messages.interrupt` 等链路残余自由文本，评估是否需要统一 descriptor fallback 并补最小测试。
   - status: open
-  - created_at: 2026-03-25T12:20:37.000Z
+  - created_at: 2026-03-25T20:54:33+08:00
   - source: agent
 
 ## Closed
+
+- NA-1774450837000 下一轮聚焦 threads 启动失败与剩余 submitError 路径的 descriptor/key 改造，收敛跨页面错误文案一致性。
+  - status: done
+  - created_at: 2026-03-25T12:20:37.000Z
+  - closed_at: 2026-03-25T20:54:33+08:00
+  - closed_by: agent
+  - source: agent
 
 - NA-1774451186000 返修 socket RPC fallback 提前翻译问题，确保 Settings config 错误提示可随语言切换刷新。
   - status: done

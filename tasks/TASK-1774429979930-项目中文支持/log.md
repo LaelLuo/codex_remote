@@ -11,3 +11,9 @@
 - 2026-03-25T12:20:37.000Z [agent] 下一小轮完成：`Reasoning` 文案与 `socket` 默认连接错误 fallback 接入 i18n；`socket.error` 改为 descriptor（key/text）并在 Home/Settings/Thread 渲染层翻译，补充 socket/i18n 测试并通过 lint。
 - 2026-03-25T12:26:26.000Z [agent] 根据 review findings 返修 socket RPC fallback：不再在 socket 层提前翻译 `socket.error.rpc`，改为携带 descriptor 的 `SocketRpcError` 透传到消费层；Settings config 读取/保存错误链路改为优先消费 descriptor，避免语言切换后提示不刷新。
 - 2026-03-25T20:31:15.2038628+08:00 [agent] 第四阶段已通过 review 子代理复审与人工复查，准备提交 `Reasoning` 与 socket 连接错误中文化改动，并继续处理 threads 启动失败与剩余 submitError 路径。
+- 2026-03-25T20:54:33+08:00 [agent] 本轮按 TDD 推进 threads 启动错误：新增 `src/lib/threads.test.ts` 并先跑红（缺少 `getThreadStartErrorMessage` 导出），随后在 `threads.svelte.ts` 引入 ThreadStartError descriptor/key 语义并转绿。
+- 2026-03-25T20:54:33+08:00 [agent] 完成 Home submitError descriptor 化：`submitError` 从 string 改为 key/text，可消费 threads 启动失败 descriptor；补充 `threads.error.*` 中英词条与 i18n 断言，并通过 `bun test src/lib/threads.test.ts`、`bun test src/lib/i18n.test.ts`、`bun run lint`。
+- 2026-03-25T21:06:31+08:00 [agent] 返修 threads callback descriptor 退化：修复 `#startThread` 两处错误包装（`#handleStartFailure(message, pending)`），并新增 callback 分支回归测试覆盖 key/text 语义传递，验证通过。
+- 2026-03-26T01:27:56+08:00 [agent] 修复 `threads.svelte.ts` 的 type narrowing 断言：`#getErrorMessage` 改为 `Record<string, unknown>` 局部变量收窄，避免 TS2352，同时保持 key/text descriptor 行为不变；已复跑 typecheck(主 tsconfig)/threads 测试/lint。
+- 2026-03-26T01:36:11+08:00 [agent] 最小修复 `api.test.ts` 基线阻塞：在测试导入 `api` 前注入 `$state` shim，避免链路导入 `i18n.svelte.ts` 时 `ReferenceError: $state is not defined`；`api.test.ts` 单跑转绿，并验证前端 lib 测试通过（受环境缺少 pytest，`bun run test` 在 Python 阶段失败）。
+- 2026-03-26T01:44:49+08:00 [agent] 修复 `package.json` 的 `ci:local` 构建命令：`bun --env-file .env.example run build` -> `bun run --env-file .env.example build`，并使用 `uv run --with pytest --with httpx --with-requirements services/control-plane/requirements.txt bun run ci:local` 完整链路验证通过。
