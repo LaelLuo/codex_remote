@@ -83,6 +83,52 @@ describe("socket orbit handlers", () => {
   });
 });
 
+describe("socket localized error descriptors", () => {
+  test("stores key descriptor when URL is missing", async () => {
+    const { socket } = await loadFreshSocketModule();
+
+    socket.connect("");
+
+    expect(socket.status).toBe("error");
+    expect(socket.error).toEqual({
+      kind: "key",
+      key: "socket.error.noServerUrlConfigured",
+    });
+  });
+
+  test("stores key descriptor with params for invalid URL", async () => {
+    const { socket } = await loadFreshSocketModule();
+
+    socket.connect("not a url");
+
+    expect(socket.status).toBe("error");
+    expect(socket.error).toEqual({
+      kind: "key",
+      key: "socket.error.invalidUrl",
+      params: { url: "not a url" },
+    });
+  });
+
+  test("uses text reason when close event provides one, otherwise key fallback", async () => {
+    const { socket } = await loadFreshSocketModule();
+    socket.connect("ws://localhost:8788/ws/client");
+    const ws = FakeWebSocket.instances[0];
+    ws.open();
+
+    ws.onclose?.({ reason: "network down" });
+    expect(socket.error).toEqual({ kind: "text", text: "network down" });
+
+    socket.connect("ws://localhost:8788/ws/client");
+    const ws2 = FakeWebSocket.instances[1];
+    ws2.open();
+    ws2.onclose?.({ reason: "" });
+    expect(socket.error).toEqual({
+      kind: "key",
+      key: "socket.error.connectionLost",
+    });
+  });
+});
+
 describe("socket rpc helpers", () => {
   test("sends orbit.artifacts.list and resolves response", async () => {
     const { socket } = await loadFreshSocketModule();
@@ -197,6 +243,34 @@ describe("socket rpc helpers", () => {
     });
     const graph = await graphPromise;
     expect(graph.graph).toContain("abc123");
+    socket.disconnect();
+  });
+
+  test("rejects RPC fallback with key descriptor instead of translated text", async () => {
+    const { getSocketErrorMessage, socket } = await loadFreshSocketModule();
+    socket.connect("ws://localhost:8788/ws/client");
+    const ws = FakeWebSocket.instances[0];
+    ws.open();
+
+    const promise = socket.artifactsList("thread-err");
+    const request = JSON.parse(ws.sent[0]) as { id: string };
+
+    ws.emitMessage({
+      type: "orbit.error",
+      requestId: request.id,
+      error: {},
+    });
+
+    try {
+      await promise;
+      throw new Error("Expected promise to reject");
+    } catch (error) {
+      expect(getSocketErrorMessage(error)).toEqual({
+        kind: "key",
+        key: "socket.error.rpc",
+      });
+      expect(error instanceof Error ? error.message : "").toBe("RPC error");
+    }
     socket.disconnect();
   });
 });

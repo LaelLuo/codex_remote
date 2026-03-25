@@ -2,6 +2,7 @@
   import { marked } from "marked";
   import DOMPurify from "dompurify";
   import { untrack } from "svelte";
+  import { i18n } from "../i18n.svelte";
   import ShimmerText from "./ShimmerText.svelte";
 
   interface Props {
@@ -69,10 +70,10 @@
     <span class="trigger-text">
       {#if isStreaming}
         <span class="trigger-text-inline">
-          <ShimmerText text="Thinking..." duration={1} />
+          <ShimmerText text={i18n.t("reasoning.thinking")} duration={1} />
         </span>
       {:else}
-        Thought for a few seconds
+        {i18n.t("reasoning.thoughtForFewSeconds")}
       {/if}
     </span>
     <svg

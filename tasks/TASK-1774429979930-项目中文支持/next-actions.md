@@ -2,12 +2,26 @@
 
 ## Open
 
-- NA-1774449208165 盘点剩余英文收尾项，区分品牌词、无障碍标签、示例占位符与仍需本地化的辅助界面文案。
+- NA-1774450837000 下一轮聚焦 threads 启动失败与剩余 submitError 路径的 descriptor/key 改造，收敛跨页面错误文案一致性。
   - status: open
-  - created_at: 2026-03-25T19:53:28.1654606+08:00
+  - created_at: 2026-03-25T12:20:37.000Z
   - source: agent
 
 ## Closed
+
+- NA-1774451186000 返修 socket RPC fallback 提前翻译问题，确保 Settings config 错误提示可随语言切换刷新。
+  - status: done
+  - created_at: 2026-03-25T12:26:26.000Z
+  - closed_at: 2026-03-25T12:26:26.000Z
+  - closed_by: agent
+  - source: agent
+
+- NA-1774449208165 盘点剩余英文收尾项，区分品牌词、无障碍标签、示例占位符与仍需本地化的辅助界面文案。
+  - status: done
+  - created_at: 2026-03-25T19:53:28.1654606+08:00
+  - closed_at: 2026-03-25T12:20:37.000Z
+  - closed_by: agent
+  - source: agent
 
 - NA-1774448884000 等待人工 review 第三阶段组件本地化结果，并确认下一批辅助组件范围。
   - status: done

@@ -415,8 +415,16 @@ const en: MessageDict = {
   "planCard.status.approved": "Approved",
 
   "working.label": "Working",
+  "reasoning.thinking": "Thinking...",
+  "reasoning.thoughtForFewSeconds": "Thought for a few seconds",
 
   "message.contextCompacted": "Context compacted",
+
+  "socket.error.noServerUrlConfigured": "No server URL configured. Set one in Settings.",
+  "socket.error.invalidUrl": "Invalid URL: {url}",
+  "socket.error.connectionLost": "Connection lost",
+  "socket.error.failedToConnect": "Failed to connect",
+  "socket.error.rpc": "RPC error",
 
   "tool.title.command": "Command",
   "tool.title.file": "File Change",
@@ -846,8 +854,16 @@ const zhCN: MessageDict = {
   "planCard.status.approved": "已批准",
 
   "working.label": "处理中",
+  "reasoning.thinking": "思考中...",
+  "reasoning.thoughtForFewSeconds": "思考了几秒钟",
 
   "message.contextCompacted": "上下文已压缩",
+
+  "socket.error.noServerUrlConfigured": "未配置服务端 URL，请在设置页填写。",
+  "socket.error.invalidUrl": "无效 URL：{url}",
+  "socket.error.connectionLost": "连接已断开",
+  "socket.error.failedToConnect": "连接失败",
+  "socket.error.rpc": "RPC 错误",
 
   "tool.title.command": "命令",
   "tool.title.file": "文件变更",

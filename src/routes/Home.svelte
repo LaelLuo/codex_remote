@@ -52,6 +52,12 @@
   const hasMoreThreads = $derived(threads.list.length > RECENT_LIMIT);
   const isConnected = $derived(socket.status === "connected");
 
+  function renderSocketError(): string {
+    if (!socket.error) return "";
+    if (socket.error.kind === "text") return socket.error.text;
+    return i18n.t(socket.error.key, socket.error.params);
+  }
+
   let paneCount = $state<PaneCount>(1);
   let panes = $state<ComposerPane[]>(createInitialPanes());
   let worktreeModalOpen = $state(false);
@@ -557,7 +563,7 @@
   {#if socket.error}
     <div class="error row">
       <span class="error-icon">✗</span>
-      <span class="error-text">{socket.error}</span>
+      <span class="error-text">{renderSocketError()}</span>
     </div>
   {/if}
 

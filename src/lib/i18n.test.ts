@@ -173,4 +173,20 @@ describe("i18n store", () => {
     expect(i18n.t("worktreeModal.searchStartDirectory")).toBe("搜索起始目录");
     expect(i18n.t("worktreeModal.gitRepositoryDetected")).toBe("检测到 Git 仓库");
   });
+
+  test("translates reasoning and socket fallback labels", async () => {
+    const { i18n } = await loadI18n();
+    expect(i18n.t("reasoning.thinking")).toBe("Thinking...");
+    expect(i18n.t("reasoning.thoughtForFewSeconds")).toBe("Thought for a few seconds");
+    expect(i18n.t("socket.error.connectionLost")).toBe("Connection lost");
+    expect(i18n.t("socket.error.invalidUrl", { url: "bad" })).toBe("Invalid URL: bad");
+    expect(i18n.t("socket.error.rpc")).toBe("RPC error");
+
+    i18n.set("zh-CN");
+    expect(i18n.t("reasoning.thinking")).toBe("思考中...");
+    expect(i18n.t("reasoning.thoughtForFewSeconds")).toBe("思考了几秒钟");
+    expect(i18n.t("socket.error.connectionLost")).toBe("连接已断开");
+    expect(i18n.t("socket.error.invalidUrl", { url: "bad" })).toBe("无效 URL：bad");
+    expect(i18n.t("socket.error.rpc")).toBe("RPC 错误");
+  });
 });

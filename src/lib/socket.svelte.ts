@@ -19,6 +19,7 @@ import type {
   ReleaseStatusResult,
   RpcMessage,
 } from "./types";
+import type { TranslationParams } from "./i18n.svelte";
 const HEARTBEAT_INTERVAL = 30_000;
 const HEARTBEAT_TIMEOUT = 10_000;
 const RECONNECT_DELAY = 2_000;
@@ -93,9 +94,28 @@ interface PendingRpcEntry {
   timeout: ReturnType<typeof setTimeout> | null;
 }
 
+export type SocketErrorMessage =
+  | { kind: "key"; key: string; params?: TranslationParams }
+  | { kind: "text"; text: string };
+
+export class SocketRpcError extends Error {
+  readonly uiMessage: SocketErrorMessage;
+
+  constructor(uiMessage: SocketErrorMessage, fallbackMessage?: string) {
+    super(fallbackMessage ?? (uiMessage.kind === "text" ? uiMessage.text : uiMessage.key));
+    this.name = "SocketRpcError";
+    this.uiMessage = uiMessage;
+  }
+}
+
+export function getSocketErrorMessage(error: unknown): SocketErrorMessage | null {
+  if (error instanceof SocketRpcError) return error.uiMessage;
+  return null;
+}
+
 class SocketStore {
   status = $state<ConnectionStatus>("disconnected");
-  error = $state<string | null>(null);
+  error = $state<SocketErrorMessage | null>(null);
 
   #socket: WebSocket | null = null;
   #url = "";
@@ -110,6 +130,14 @@ class SocketStore {
   #subscribedThreads = new Set<string>();
   #rpcIdCounter = 0;
   #pendingRpc = new Map<number | string, PendingRpcEntry>();
+
+  #setErrorKey(key: string, params?: TranslationParams) {
+    this.error = { kind: "key", key, ...(params ? { params } : {}) };
+  }
+
+  #setErrorText(text: string) {
+    this.error = { kind: "text", text };
+  }
 
   get url() {
     return this.#url;
@@ -140,7 +168,7 @@ class SocketStore {
     const trimmed = url.trim();
     if (!trimmed) {
       this.status = "error";
-      this.error = "No server URL configured. Set one in Settings.";
+      this.#setErrorKey("socket.error.noServerUrlConfigured");
       return;
     }
 
@@ -162,7 +190,7 @@ class SocketStore {
       this.#socket = new WebSocket(wsUrl);
     } catch {
       this.status = "error";
-      this.error = `Invalid URL: ${trimmed}`;
+      this.#setErrorKey("socket.error.invalidUrl", { url: trimmed });
       return;
     }
 
@@ -186,13 +214,18 @@ class SocketStore {
       }
 
       this.status = "reconnecting";
-      this.error = event.reason || "Connection lost";
+      const reason = event.reason?.trim();
+      if (reason) {
+        this.#setErrorText(reason);
+      } else {
+        this.#setErrorKey("socket.error.connectionLost");
+      }
       this.#scheduleReconnect();
     };
 
     this.#socket.onerror = () => {
       if (this.status === "connecting") {
-        this.error = "Failed to connect";
+        this.#setErrorKey("socket.error.failedToConnect");
       }
     };
 
@@ -213,8 +246,12 @@ class SocketStore {
               const errorMessage =
                 typeof errObj.message === "string" && errObj.message.trim()
                   ? errObj.message
-                  : "RPC error";
-              pending.reject(new Error(errorMessage));
+                  : null;
+              if (errorMessage) {
+                pending.reject(new SocketRpcError({ kind: "text", text: errorMessage }, errorMessage));
+              } else {
+                pending.reject(new SocketRpcError({ kind: "key", key: "socket.error.rpc" }, "RPC error"));
+              }
             } else {
               pending.resolve(msg.result !== undefined ? msg.result : msg);
             }

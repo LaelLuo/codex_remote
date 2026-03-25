@@ -497,7 +497,7 @@
                     {#if sendError || (socket.status !== "connected" && socket.status !== "connecting" && socket.error)}
                         <div class="connection-error row">
                             <span class="error-icon row">!</span>
-                            <span class="error-text">{sendError ? renderMessage(sendError) : socket.error}</span>
+                            <span class="error-text">{sendError ? renderMessage(sendError) : renderMessage(socket.error)}</span>
                             {#if socket.status === "reconnecting"}
                                 <span class="error-hint">{i18n.t("thread.connection.reconnectingAuto")}</span>
                             {:else if socket.status === "error" || socket.status === "disconnected"}

@@ -4,7 +4,7 @@
   import { i18n, type Locale, type TranslationParams } from "../lib/i18n.svelte";
   import { config } from "../lib/config.svelte";
   import { connectionManager } from "../lib/connection-manager.svelte";
-  import { socket } from "../lib/socket.svelte";
+  import { getSocketErrorMessage, socket } from "../lib/socket.svelte";
   import AppHeader from "../lib/components/AppHeader.svelte";
   import NotificationSettings from "../lib/components/NotificationSettings.svelte";
   import ReleaseCockpit from "../lib/components/ReleaseCockpit.svelte";
@@ -73,6 +73,23 @@
     codexConfigInfo = { kind: "key", key, ...(params ? { params } : {}) };
   }
 
+  function setCodexConfigErrorFromUnknown(err: unknown, fallbackKey: string) {
+    const socketMessage = getSocketErrorMessage(err);
+    if (socketMessage?.kind === "key") {
+      setCodexConfigErrorKey(socketMessage.key, socketMessage.params);
+      return;
+    }
+    if (socketMessage?.kind === "text") {
+      setCodexConfigErrorText(socketMessage.text);
+      return;
+    }
+    if (err instanceof Error) {
+      setCodexConfigErrorText(err.message);
+      return;
+    }
+    setCodexConfigErrorKey(fallbackKey);
+  }
+
   function formatSince(iso: string): string {
     const date = new Date(iso);
     return i18n.formatDate(date, {
@@ -137,11 +154,7 @@
         setCodexConfigInfoKey("settings.hint.configWillCreateAtPath", { path: result.path });
       }
     } catch (err) {
-      if (err instanceof Error) {
-        setCodexConfigErrorText(err.message);
-      } else {
-        setCodexConfigErrorKey("settings.hint.failedLoadConfig");
-      }
+      setCodexConfigErrorFromUnknown(err, "settings.hint.failedLoadConfig");
     } finally {
       codexConfigLoading = false;
     }
@@ -175,11 +188,7 @@
       codexConfigLoadedFor = resolveConfigTargetKey();
       setCodexConfigInfoKey("settings.hint.savedPath", { path: result.path });
     } catch (err) {
-      if (err instanceof Error) {
-        setCodexConfigErrorText(err.message);
-      } else {
-        setCodexConfigErrorKey("settings.hint.failedSaveConfig");
-      }
+      setCodexConfigErrorFromUnknown(err, "settings.hint.failedSaveConfig");
     } finally {
       codexConfigSaving = false;
     }
@@ -292,7 +301,7 @@
           </button>
         </div>
         {#if socket.error}
-          <p class="hint hint-error">{socket.error}</p>
+          <p class="hint hint-error">{toMessageText(socket.error)}</p>
         {/if}
         <p class="hint">
           {socket.status === "disconnected"
