@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { OrbitArtifact } from "../types";
+  import { i18n } from "../i18n.svelte";
 
   type Props = {
     threadId?: string | null;
@@ -20,7 +21,7 @@
   function formatTimestamp(iso: string): string {
     const date = new Date(iso);
     if (!Number.isFinite(date.getTime())) return iso;
-    return date.toLocaleString(undefined, {
+    return i18n.formatDate(date, {
       month: "short",
       day: "numeric",
       hour: "2-digit",
@@ -38,14 +39,14 @@
 <section class="artifacts-panel stack" aria-live="polite">
   <header class="panel-head row">
     <div class="panel-title-wrap stack">
-      <span class="panel-kicker">Thread data</span>
-      <h2>Artifacts Timeline</h2>
+      <span class="panel-kicker">{i18n.t("artifacts.panelKicker")}</span>
+      <h2>{i18n.t("artifacts.title")}</h2>
       {#if threadId}
-        <p class="panel-subtle">Thread {threadId.slice(0, 8)}</p>
+        <p class="panel-subtle">{i18n.t("artifacts.threadLabel", { id: threadId.slice(0, 8) })}</p>
       {/if}
     </div>
     <button type="button" class="refresh-btn" onclick={() => onRefresh?.()} disabled={loading}>
-      {loading ? "Refreshing..." : "Refresh"}
+      {loading ? i18n.t("artifacts.refreshing") : i18n.t("artifacts.refresh")}
     </button>
   </header>
 
@@ -54,9 +55,9 @@
   {/if}
 
   {#if loading && artifacts.length === 0}
-    <p class="hint">Loading artifacts timeline...</p>
+    <p class="hint">{i18n.t("artifacts.loading")}</p>
   {:else if artifacts.length === 0}
-    <p class="hint">No artifacts yet for this thread.</p>
+    <p class="hint">{i18n.t("artifacts.empty")}</p>
   {:else}
     <ol class="timeline">
       {#each artifacts as artifact (artifact.id)}

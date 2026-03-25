@@ -3,6 +3,7 @@
   import { socket } from "../socket.svelte";
   import { anchors } from "../anchors.svelte";
   import { auth } from "../auth.svelte";
+  import { i18n, type TranslationParams } from "../i18n.svelte";
   import type { FileChangeEntry, Message } from "../types";
 
   interface Props {
@@ -12,18 +13,36 @@
 
   const { message, defaultOpen = false }: Props = $props();
 
+  type UiMessage =
+    | { kind: "key"; key: string; params?: TranslationParams }
+    | { kind: "text"; text: string };
+
   let isOpen = $state(untrack(() => defaultOpen || message.kind === "image"));
   let imagePreviewUrl = $state<string | null>(null);
   let imageLoading = $state(false);
-  let imageError = $state<string | null>(null);
+  let imageError = $state<UiMessage | null>(null);
   let loadedImageKey = $state("");
   let selectedFilePath = $state<string | null>(null);
   let selectedFileView = $state<"diff" | "file">("diff");
   let selectedFileContent = $state<string>("");
   let selectedFileLoading = $state(false);
-  let selectedFileError = $state<string | null>(null);
+  let selectedFileError = $state<UiMessage | null>(null);
   let selectedFileTruncated = $state(false);
   const filePreviewCache = new Map<string, { content: string; truncated: boolean }>();
+
+  function messageKey(key: string, params?: TranslationParams): UiMessage {
+    return { kind: "key", key, ...(params ? { params } : {}) };
+  }
+
+  function messageText(text: string): UiMessage {
+    return { kind: "text", text };
+  }
+
+  function renderMessage(message: UiMessage | null): string {
+    if (!message) return "";
+    if (message.kind === "text") return message.text;
+    return i18n.t(message.key, message.params);
+  }
 
   function toggle() {
     isOpen = !isOpen;
@@ -62,23 +81,23 @@
     const kind = message.kind;
     switch (kind) {
       case "command":
-        return { icon: "terminal", label: "Command", color: "var(--cli-prefix-tool)" };
+        return { icon: "terminal", label: i18n.t("tool.title.command"), color: "var(--cli-prefix-tool)" };
       case "file":
-        return { icon: "file", label: "File Change", color: "var(--cli-prefix-file)" };
+        return { icon: "file", label: i18n.t("tool.title.file"), color: "var(--cli-prefix-file)" };
       case "mcp":
-        return { icon: "plug", label: "MCP Tool", color: "var(--cli-prefix-mcp)" };
+        return { icon: "plug", label: i18n.t("tool.title.mcp"), color: "var(--cli-prefix-mcp)" };
       case "web":
-        return { icon: "search", label: "Web Search", color: "var(--cli-prefix-web)" };
+        return { icon: "search", label: i18n.t("tool.title.web"), color: "var(--cli-prefix-web)" };
       case "image":
-        return { icon: "image", label: "Image", color: "var(--cli-prefix-image)" };
+        return { icon: "image", label: i18n.t("tool.title.image"), color: "var(--cli-prefix-image)" };
       case "review":
-        return { icon: "eye", label: "Review", color: "var(--cli-prefix-review)" };
+        return { icon: "eye", label: i18n.t("tool.title.review"), color: "var(--cli-prefix-review)" };
       case "plan":
-        return { icon: "plan", label: "Plan", color: "var(--cli-prefix-agent)" };
+        return { icon: "plan", label: i18n.t("tool.title.plan"), color: "var(--cli-prefix-agent)" };
       case "collab":
-        return { icon: "users", label: "Agent", color: "var(--cli-prefix-mcp)" };
+        return { icon: "users", label: i18n.t("tool.title.agent"), color: "var(--cli-prefix-mcp)" };
       default:
-        return { icon: "wrench", label: "Tool", color: "var(--cli-prefix-tool)" };
+        return { icon: "wrench", label: i18n.t("tool.title.default"), color: "var(--cli-prefix-tool)" };
     }
   });
 
@@ -97,7 +116,7 @@
           exitCode: message.metadata?.exitCode
         };
       }
-      return { title: "Command", content: text, exitCode: message.metadata?.exitCode };
+      return { title: i18n.t("tool.title.command"), content: text, exitCode: message.metadata?.exitCode };
     }
 
     if (kind === "file") {
@@ -105,39 +124,39 @@
         ? message.metadata.fileChanges
         : parseLegacyFileChange(text);
       const title = list.length === 1
-        ? (list[0]?.path || "File")
-        : `File changes (${list.length})`;
+        ? (list[0]?.path || i18n.t("tool.title.fileFallback"))
+        : i18n.t("tool.title.fileChanges", { count: list.length });
       return { title, content: "" };
     }
 
     if (kind === "mcp") {
       const match = text.match(/^Tool:\s*(.+?)(?:\n|$)/);
-      const toolName = match?.[1] || "MCP Tool";
+      const toolName = match?.[1] || i18n.t("tool.title.mcp");
       const content = match ? text.slice(match[0].length) : text;
       return { title: toolName, content };
     }
 
     if (kind === "web") {
       const match = text.match(/^Search:\s*(.+?)(?:\n|$)/);
-      return { title: match?.[1] || "Web Search", content: "" };
+      return { title: match?.[1] || i18n.t("tool.title.web"), content: "" };
     }
 
     if (kind === "image") {
       const match = text.match(/^Image:\s*(.+?)(?:\n|$)/);
       const source = message.metadata?.imagePath || message.metadata?.imageUrl || match?.[1];
-      return { title: source || "Image", content: "" };
+      return { title: source || i18n.t("tool.title.image"), content: "" };
     }
 
     if (kind === "plan") {
-      return { title: "Proposed Plan", content: text };
+      return { title: i18n.t("tool.title.plan"), content: text };
     }
 
     if (kind === "collab") {
       const lines = text.split("\n");
-      return { title: lines[0] || "Agent", content: lines.slice(1).join("\n") };
+      return { title: lines[0] || i18n.t("tool.title.agent"), content: lines.slice(1).join("\n") };
     }
 
-    return { title: text.slice(0, 50), content: text };
+    return { title: text.slice(0, 50) || i18n.t("tool.title.default"), content: text };
   });
 
   // Status based on exit code or content
@@ -151,11 +170,15 @@
   const statusConfig = $derived.by(() => {
     switch (status) {
       case "success":
-        return { icon: "check", label: "Done", color: "var(--cli-success)" };
+        return { icon: "check", label: i18n.t("tool.status.done"), color: "var(--cli-success)" };
       case "error":
-        return { icon: "x", label: `Exit ${message.metadata?.exitCode}`, color: "var(--cli-error)" };
+        return {
+          icon: "x",
+          label: i18n.t("tool.status.exit", { code: message.metadata?.exitCode ?? "?" }),
+          color: "var(--cli-error)",
+        };
       default:
-        return { icon: "check", label: "Done", color: "var(--cli-success)" };
+        return { icon: "check", label: i18n.t("tool.status.done"), color: "var(--cli-success)" };
     }
   });
 
@@ -238,7 +261,7 @@
     } catch (err) {
       selectedFileContent = "";
       selectedFileTruncated = false;
-      selectedFileError = err instanceof Error ? err.message : "Failed to read file.";
+      selectedFileError = err instanceof Error ? messageText(err.message) : messageKey("tool.error.readFileFailed");
     } finally {
       selectedFileLoading = false;
     }
@@ -264,7 +287,7 @@
     if (!path) {
       imagePreviewUrl = null;
       imageLoading = false;
-      imageError = "No image source available.";
+      imageError = messageKey("tool.error.noImageSource");
       return;
     }
 
@@ -277,7 +300,7 @@
       })
       .catch((err) => {
         imageLoading = false;
-        imageError = err instanceof Error ? err.message : "Failed to load image.";
+        imageError = err instanceof Error ? messageText(err.message) : messageKey("tool.error.loadImageFailed");
       });
   });
 
@@ -388,9 +411,9 @@
       {#if isImage}
         <div class="tool-image-content stack">
           {#if imageLoading}
-            <div class="tool-image-status">Loading image...</div>
+            <div class="tool-image-status">{i18n.t("tool.image.loading")}</div>
           {:else if imageError}
-            <div class="tool-image-status error">{imageError}</div>
+            <div class="tool-image-status error">{renderMessage(imageError)}</div>
           {:else if imagePreviewUrl}
             <a class="tool-image-link" href={imagePreviewUrl} target="_blank" rel="noreferrer">
               <img class="tool-image-preview" src={imagePreviewUrl} alt={toolInfo.title} loading="lazy" />
@@ -407,19 +430,19 @@
               {/if}
             </div>
           {:else}
-            <div class="tool-image-status">Image unavailable.</div>
+            <div class="tool-image-status">{i18n.t("tool.image.unavailable")}</div>
           {/if}
         </div>
       {:else if isFile}
         <div class="tool-file-content stack">
           <div class="file-summary row">
-            <span class="file-summary-chip">Files {fileChanges.length}</span>
+            <span class="file-summary-chip">{i18n.t("tool.file.summary", { count: fileChanges.length })}</span>
             <span class="file-summary-chip add">+{totalLinesAdded}</span>
             <span class="file-summary-chip remove">-{totalLinesRemoved}</span>
           </div>
 
           {#if fileChanges.length === 0}
-            <div class="tool-image-status">No file changes details available.</div>
+            <div class="tool-image-status">{i18n.t("tool.file.noDetails")}</div>
           {:else}
             <div class="file-list stack">
               {#each fileChanges as entry (entry.path)}
@@ -430,7 +453,7 @@
                   <span class="file-lines add">+{entry.linesAdded}</span>
                   <span class="file-lines remove">-{entry.linesRemoved}</span>
                   <button class="file-open-btn" type="button" onclick={() => void openFilePreview(entry.path)}>
-                    Open file
+                    {i18n.t("tool.file.open")}
                   </button>
                 </div>
               {/each}
@@ -449,27 +472,27 @@
                         selectedFileError = null;
                       }}
                     >
-                      Diff
+                      {i18n.t("tool.file.tab.diff")}
                     </button>
                     <button
                       class:active={selectedFileView === "file"}
                       type="button"
                       onclick={() => void openFilePreview(selectedFileChange.path)}
                     >
-                      File
+                      {i18n.t("tool.file.tab.file")}
                     </button>
                   </span>
                 </div>
 
                 {#if selectedFileView === "diff"}
-                  <pre class="tool-output">{selectedFileChange.diff || "No diff payload for this file."}</pre>
+                  <pre class="tool-output">{selectedFileChange.diff || i18n.t("tool.file.noDiffPayload")}</pre>
                 {:else if selectedFileLoading}
-                  <div class="tool-image-status">Loading file...</div>
+                  <div class="tool-image-status">{i18n.t("tool.file.loading")}</div>
                 {:else if selectedFileError}
-                  <div class="tool-image-status error">{selectedFileError}</div>
+                  <div class="tool-image-status error">{renderMessage(selectedFileError)}</div>
                 {:else}
                   {#if selectedFileTruncated}
-                    <div class="tool-image-status">File is too large and was not loaded.</div>
+                    <div class="tool-image-status">{i18n.t("tool.file.tooLarge")}</div>
                   {/if}
                   <pre class="tool-output">{selectedFileContent}</pre>
                 {/if}

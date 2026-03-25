@@ -9,6 +9,7 @@
     import { anchors } from "../lib/anchors.svelte";
     import { artifacts as artifactsStore } from "../lib/artifacts.svelte";
     import { auth } from "../lib/auth.svelte";
+    import { i18n, type TranslationParams } from "../lib/i18n.svelte";
     import { theme } from "../lib/theme.svelte";
     import {
         parseUlwCommand,
@@ -29,6 +30,10 @@
     import ArtifactsTimeline from "../lib/components/ArtifactsTimeline.svelte";
 
     const themeIcons = { system: "◐", light: "○", dark: "●" } as const;
+
+    type UiMessage =
+      | { kind: "key"; key: string; params?: TranslationParams }
+      | { kind: "text"; text: string };
 
     let model = $state("");
     let reasoningEffort = $state<ReasoningEffort>("medium");
@@ -69,10 +74,21 @@
         return "";
     });
     const threadStatusLabel = $derived.by(() => {
-        if (socket.status === "connected") return "Live";
-        if (socket.status === "connecting") return "Connecting";
-        if (socket.status === "reconnecting") return "Reconnecting";
-        return "Offline";
+        if (socket.status === "connected") return i18n.t("thread.status.live");
+        if (socket.status === "connecting") return i18n.t("thread.status.connecting");
+        if (socket.status === "reconnecting") return i18n.t("thread.status.reconnecting");
+        return i18n.t("thread.status.offline");
+    });
+    const modeLabel = $derived.by(() => {
+        if (mode === "code") return i18n.t("common.code");
+        if (mode === "plan") return i18n.t("common.plan");
+        return mode;
+    });
+    const sandboxLabel = $derived.by(() => {
+        if (sandbox === "read-only") return i18n.t("appHeader.sandbox.readOnly");
+        if (sandbox === "workspace-write") return i18n.t("appHeader.sandbox.workspace");
+        if (sandbox === "danger-full-access") return i18n.t("appHeader.sandbox.fullAccess");
+        return sandbox;
     });
 
 
@@ -139,7 +155,21 @@
         });
     });
 
-    let sendError = $state<string | null>(null);
+    let sendError = $state<UiMessage | null>(null);
+
+    function setSendErrorKey(key: string, params?: TranslationParams) {
+        sendError = { kind: "key", key, ...(params ? { params } : {}) };
+    }
+
+    function setSendErrorText(text: string) {
+        sendError = { kind: "text", text };
+    }
+
+    function renderMessage(message: UiMessage | null): string {
+        if (!message) return "";
+        if (message.kind === "text") return message.text;
+        return i18n.t(message.key, message.params);
+    }
 
     function buildTurnInputItems(inputText: string, imageInputs: TurnImageInput[]): Array<Record<string, unknown>> {
         const normalizedInput = inputText.trim();
@@ -163,11 +193,11 @@
         const selectedAnchorId = !auth.isLocalMode ? anchors.selectedId : null;
         if (!auth.isLocalMode) {
             if (!selectedAnchorId) {
-                sendError = "Select a device in Settings before sending messages.";
+                setSendErrorKey("thread.error.selectDeviceBeforeSend");
                 return false;
             }
             if (!anchors.selected) {
-                sendError = "Selected device is offline. Choose another device in Settings.";
+                setSendErrorKey("thread.error.selectedDeviceOffline");
                 return false;
             }
         }
@@ -208,7 +238,11 @@
         });
 
         if (!result.success) {
-            sendError = result.error ?? "Failed to send message";
+            if (result.error) {
+                setSendErrorText(result.error);
+            } else {
+                setSendErrorKey("thread.error.sendFailed");
+            }
             return false;
         }
 
@@ -221,7 +255,7 @@
         const normalizedInput = inputText.trim();
         if (!normalizedInput && imageInputs.length === 0) return;
         if (imageInputs.length > 0 && (normalizedInput.startsWith("/u") || normalizedInput.startsWith("!"))) {
-            sendError = "Images can be sent with normal messages only.";
+            setSendErrorKey("thread.error.imagesNormalOnly");
             return;
         }
 
@@ -237,7 +271,7 @@
                 typeof ulwCommand.maxIterations !== "number" &&
                 !ulwCommand.completionPromise
             ) {
-                sendError = "Usage: /u config max=30 promise=DONE";
+                setSendErrorKey("thread.error.ulwConfigUsage");
                 return;
             }
             const configured = ulwRuntime.configure(threadId, {
@@ -254,7 +288,7 @@
         if (ulwCommand?.kind === "start") {
             const task = ulwCommand.task ?? pickUlwTaskFromMessages(messages.getThreadMessages(threadId));
             if (!task) {
-                sendError = "Add a task after /u, or send a normal task message first.";
+                setSendErrorKey("thread.error.addTaskAfterU");
                 return;
             }
 
@@ -272,7 +306,7 @@
         const bangCommand = parseBangTerminalCommand(normalizedInput);
         if (bangCommand) {
             if (!bangCommand.command) {
-                sendError = "Usage: !<command> or !pwsh|cmd|bash|sh|zsh|fish <command>";
+                setSendErrorKey("thread.error.bangUsage");
                 return;
             }
 
@@ -298,7 +332,11 @@
         }
         const result = messages.interrupt(threadId);
         if (!result.success) {
-            sendError = result.error ?? "Failed to stop turn";
+            if (result.error) {
+                setSendErrorText(result.error);
+            } else {
+                setSendErrorKey("thread.error.stopTurnFailed");
+            }
         }
     }
 
@@ -306,7 +344,7 @@
         messages.approvePlan(messageId);
         modeUserOverride = true;
         mode = "code";
-        handleSubmit("Approved. Proceed with implementation.");
+        handleSubmit(i18n.t("thread.plan.approvedProceed"));
     }
 
     function refreshArtifacts() {
@@ -354,7 +392,7 @@
 </script>
 
 <svelte:head>
-    <title>Thread {threadShortId} — Codex Remote</title>
+    <title>{i18n.t("thread.title", { id: threadShortId })}</title>
 </svelte:head>
 
 <div class="thread-page stack">
@@ -365,8 +403,12 @@
         onSandboxChange={(v) => sandbox = v}
     >
         {#snippet actions()}
-            <a href="/settings">Settings</a>
-            <button type="button" onclick={() => theme.cycle()} title="Theme: {theme.current}">
+            <a href="/settings">{i18n.t("thread.settingsLink")}</a>
+            <button
+              type="button"
+              onclick={() => theme.cycle()}
+              title={i18n.t("common.themeTitle", { theme: i18n.themeName(theme.current) })}
+            >
                 {themeIcons[theme.current]}
             </button>
         {/snippet}
@@ -375,17 +417,17 @@
     <main class="thread-main">
         <section class="thread-shell stack">
             <header class="thread-masthead">
-                <span class="thread-kicker">Thread workspace</span>
+                <span class="thread-kicker">{i18n.t("thread.workspaceKicker")}</span>
                 <h1 class="thread-title">
-                    <span class="thread-title-main">DIALOGUE</span>
-                    <span class="thread-title-sub">session {threadShortId}</span>
+                    <span class="thread-title-main">{i18n.t("thread.dialogue")}</span>
+                    <span class="thread-title-sub">{i18n.t("thread.sessionLabel", { id: threadShortId })}</span>
                 </h1>
                 <div class="thread-meta row">
                     <span class="meta-chip">{threadStatusLabel}</span>
                     <span class="meta-sep">·</span>
-                    <span class="meta-label">mode {mode}</span>
+                    <span class="meta-label">{i18n.t("thread.meta.mode", { mode: modeLabel })}</span>
                     <span class="meta-sep">·</span>
-                    <span class="meta-label">sandbox {sandbox}</span>
+                    <span class="meta-label">{i18n.t("thread.meta.sandbox", { sandbox: sandboxLabel })}</span>
                 </div>
             </header>
 
@@ -393,8 +435,8 @@
                 <div class="transcript" bind:this={container}>
                     {#if messages.current.length === 0}
                         <div class="empty stack">
-                            <span class="empty-word">BEGIN</span>
-                            <p class="empty-text">No messages yet. Write the first prompt to start this session.</p>
+                            <span class="empty-word">{i18n.t("thread.empty.begin")}</span>
+                            <p class="empty-text">{i18n.t("thread.empty.noMessages")}</p>
                         </div>
                     {:else}
                         {#each messages.current as message (message.id)}
@@ -455,12 +497,12 @@
                     {#if sendError || (socket.status !== "connected" && socket.status !== "connecting" && socket.error)}
                         <div class="connection-error row">
                             <span class="error-icon row">!</span>
-                            <span class="error-text">{sendError || socket.error}</span>
+                            <span class="error-text">{sendError ? renderMessage(sendError) : socket.error}</span>
                             {#if socket.status === "reconnecting"}
-                                <span class="error-hint">Reconnecting automatically...</span>
+                                <span class="error-hint">{i18n.t("thread.connection.reconnectingAuto")}</span>
                             {:else if socket.status === "error" || socket.status === "disconnected"}
                                 <button type="button" class="retry-btn" onclick={() => socket.reconnect()}>
-                                    Retry
+                                    {i18n.t("thread.connection.retry")}
                                 </button>
                             {/if}
                         </div>

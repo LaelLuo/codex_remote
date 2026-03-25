@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { UserInputRequest } from "../types";
+  import { i18n } from "../i18n.svelte";
 
   interface Props {
     request: UserInputRequest;
@@ -83,7 +84,7 @@
 
 <div class="input-card" class:resolved={request.status !== "pending"}>
   <div class="card-header">
-    <span class="header-label">Questions</span>
+    <span class="header-label">{i18n.t("userInput.header.questions")}</span>
   </div>
 
   {#each questions as question, qi}
@@ -126,7 +127,7 @@
           <input
             type={question.isSecret ? "password" : "text"}
             class="text-input"
-            placeholder="Type your answer..."
+            placeholder={i18n.t("userInput.placeholder.answer")}
             bind:value={textInputs[question.id]}
             disabled={request.status !== "pending"}
           />
@@ -143,10 +144,10 @@
         disabled={!canSubmit}
         onclick={handleSubmit}
       >
-        Submit
+        {i18n.t("userInput.submit")}
       </button>
     {:else}
-      <span class="status-badge">Answered</span>
+      <span class="status-badge">{i18n.t("userInput.answered")}</span>
     {/if}
   </div>
 </div>

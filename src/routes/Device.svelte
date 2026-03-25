@@ -1,13 +1,32 @@
 <script lang="ts">
   import { auth } from "../lib/auth.svelte";
+  import { i18n, type TranslationParams } from "../lib/i18n.svelte";
   import AuthPageLayout from "../lib/components/AuthPageLayout.svelte";
 
   const AUTH_BASE_URL = (import.meta.env.AUTH_URL ?? "").replace(/\/$/, "");
 
+  type UiMessage =
+    | { kind: "key"; key: string; params?: TranslationParams }
+    | { kind: "text"; text: string };
+
   let userCode = $state("");
   let busy = $state(false);
-  let error = $state<string | null>(null);
+  let error = $state<UiMessage | null>(null);
   let success = $state(false);
+
+  function setErrorKey(key: string, params?: TranslationParams) {
+    error = { kind: "key", key, ...(params ? { params } : {}) };
+  }
+
+  function setErrorText(text: string) {
+    error = { kind: "text", text };
+  }
+
+  function renderMessage(message: UiMessage | null): string {
+    if (!message) return "";
+    if (message.kind === "text") return message.text;
+    return i18n.t(message.key, message.params);
+  }
 
   async function handleAuthorise(e?: Event) {
     e?.preventDefault();
@@ -29,14 +48,18 @@
       const data = (await response.json()) as { ok?: boolean; error?: string };
 
       if (!response.ok || !data.ok) {
-        error = data.error ?? "Authorization failed.";
+        if (data.error) {
+          setErrorText(data.error);
+        } else {
+          setErrorKey("device.error.authorizationFailed");
+        }
         return;
       }
 
       success = true;
       setTimeout(() => { window.location.href = "/"; }, 1500);
     } catch {
-      error = "Could not reach auth backend.";
+      setErrorKey("device.error.authBackendUnreachable");
     } finally {
       busy = false;
     }
@@ -58,29 +81,29 @@
 </script>
 
 <svelte:head>
-  <title>Device authorisation - Codex Remote</title>
+  <title>{i18n.t("device.title")}</title>
 </svelte:head>
 
 <AuthPageLayout>
-  <span class="eyebrow">Device authorisation</span>
+  <span class="eyebrow">{i18n.t("device.eyebrow")}</span>
 
   {#if auth.status === "loading"}
-    <h1>Loading</h1>
-    <p class="subtitle">Checking your session...</p>
+    <h1>{i18n.t("device.loading")}</h1>
+    <p class="subtitle">{i18n.t("device.checkingSession")}</p>
   {:else if auth.status !== "signed_in"}
-    <h1>Sign in required</h1>
-    <p class="subtitle">You need an active account session before authorising a device.</p>
-    <a href="/" class="primary-link">Go to sign in</a>
+    <h1>{i18n.t("device.signInRequired")}</h1>
+    <p class="subtitle">{i18n.t("device.signInRequiredSubtitle")}</p>
+    <a href="/" class="primary-link">{i18n.t("device.goToSignIn")}</a>
   {:else if success}
-    <h1>Device authorised</h1>
-    <p class="subtitle">Your anchor is connected. You can close this page.</p>
-    <a href="/app" class="link-btn">Open app</a>
+    <h1>{i18n.t("device.authorised")}</h1>
+    <p class="subtitle">{i18n.t("device.authorisedSubtitle")}</p>
+    <a href="/app" class="link-btn">{i18n.t("device.openApp")}</a>
   {:else}
-    <h1>Connect anchor</h1>
-    <p class="subtitle">Enter the code shown in your terminal.</p>
+    <h1>{i18n.t("device.connectAnchor")}</h1>
+    <p class="subtitle">{i18n.t("device.enterCodeHint")}</p>
 
     {#if error}
-      <div class="auth-error">{error}</div>
+      <div class="auth-error">{renderMessage(error)}</div>
     {/if}
 
     <form class="form stack" onsubmit={handleAuthorise}>
@@ -99,7 +122,7 @@
         class="primary-btn"
         disabled={busy || userCode.replace(/-/g, "").length !== 8}
       >
-        {busy ? "Authorising..." : "Authorise"}
+        {busy ? i18n.t("device.authorising") : i18n.t("device.authorise")}
       </button>
     </form>
   {/if}

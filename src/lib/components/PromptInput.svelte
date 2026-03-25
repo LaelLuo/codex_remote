@@ -1,5 +1,6 @@
 <script lang="ts">
   import { extractClipboardImageFiles, readTurnImages } from "../input-images";
+  import { i18n } from "../i18n.svelte";
   import type { ModeKind, ModelOption, ReasoningEffort, TurnImageInput } from "../types";
 
   interface Props {
@@ -39,32 +40,33 @@
 
   const canSubmit = $derived((input.trim().length > 0 || attachedImages.length > 0) && !disabled);
 
-  const reasoningOptions: { value: ReasoningEffort; label: string }[] = [
-    { value: "low", label: "Low" },
-    { value: "medium", label: "Medium" },
-    { value: "high", label: "High" },
-  ];
+  const reasoningOptions: ReasoningEffort[] = ["low", "medium", "high"];
 
   const selectedModelOption = $derived(modelOptions.find((m) => m.value === model));
+
+  function reasoningLabel(value: ReasoningEffort): string {
+    return i18n.t(`prompt.reasoning.${value}`);
+  }
+
   const availableReasoningOptions = $derived.by(() => {
     const supported = selectedModelOption?.supportedReasoningEfforts;
     if (!supported?.length) return reasoningOptions;
-    const map = new Map(reasoningOptions.map((option) => [option.value, option]));
+    const map = new Map(reasoningOptions.map((option) => [option, option]));
     const filtered = supported
       .map((effort) => map.get(effort))
-      .filter((option): option is { value: ReasoningEffort; label: string } => Boolean(option));
+      .filter((option): option is ReasoningEffort => Boolean(option));
     return filtered.length > 0 ? filtered : reasoningOptions;
   });
 
   const selectedModel = $derived(
-    modelOptions.find((m) => m.value === model)?.label || model || "Model"
+    modelOptions.find((m) => m.value === model)?.label || model || i18n.t("prompt.modelFallback")
   );
 
-  const selectedReasoning = $derived(
-    availableReasoningOptions.find((r) => r.value === reasoningEffort)?.label ||
-      reasoningOptions.find((r) => r.value === reasoningEffort)?.label ||
-      "Medium"
-  );
+  const selectedReasoning = $derived.by(() => {
+    if (availableReasoningOptions.includes(reasoningEffort)) return reasoningLabel(reasoningEffort);
+    if (reasoningOptions.includes(reasoningEffort)) return reasoningLabel(reasoningEffort);
+    return reasoningLabel("medium");
+  });
 
   function handleSubmit(e: Event) {
     e.preventDefault();
@@ -145,15 +147,15 @@
 <form class="prompt-input" onsubmit={handleSubmit}>
   <div class="input-container stack">
     <div class="composer-head split">
-      <span class="composer-kicker">Thread Composer</span>
-      <span class="composer-whisper">paste image • !command • /u task</span>
+      <span class="composer-kicker">{i18n.t("prompt.composerKicker")}</span>
+      <span class="composer-whisper">{i18n.t("prompt.composerWhisper")}</span>
     </div>
 
     <textarea
       bind:value={input}
       onkeydown={handleKeydown}
       onpaste={handlePaste}
-      placeholder="Describe the next step for the agent."
+      placeholder={i18n.t("prompt.placeholder")}
       rows="1"
       {disabled}
     ></textarea>
@@ -180,7 +182,7 @@
             <button type="button" class="attachment-remove" onclick={() => removeAttachment(image.id)}>×</button>
           </div>
         {/each}
-        <button type="button" class="attachment-clear" onclick={clearAttachments}>Clear</button>
+        <button type="button" class="attachment-clear" onclick={clearAttachments}>{i18n.t("common.clear")}</button>
       </div>
     {/if}
 
@@ -193,7 +195,7 @@
         <button
           type="button"
           class="tool-btn quick-action quick-action-primary row"
-          title="Start UltraWork loop"
+          title={i18n.t("prompt.title.startUlw")}
           onclick={handleUlwShortcut}
           disabled={disabled}
         >
@@ -203,20 +205,20 @@
         <button
           type="button"
           class="tool-btn quick-action quick-action-stop row"
-          title="Stop ULW loop"
+          title={i18n.t("prompt.title.stopUlw")}
           onclick={handleUlwStopShortcut}
         >
-          Stop
+          {i18n.t("prompt.stop")}
         </button>
 
         <button
           type="button"
           class="tool-btn quick-action row"
-          title="Attach images"
+          title={i18n.t("prompt.title.attachImages")}
           onclick={openImagePicker}
           disabled={disabled}
         >
-          Img
+          {i18n.t("common.img")}
         </button>
 
         <!-- Model Selector -->
@@ -242,9 +244,9 @@
           {#if modelOpen}
             <div class="dropdown-menu">
               {#if modelsLoading}
-                <div class="dropdown-empty">Loading...</div>
+                <div class="dropdown-empty">{i18n.t("prompt.loading")}</div>
               {:else if modelOptions.length === 0}
-                <div class="dropdown-empty">No models available</div>
+                <div class="dropdown-empty">{i18n.t("prompt.noModels")}</div>
               {:else}
                 {#each modelOptions as option}
                   <button
@@ -302,14 +304,14 @@
                 <button
                   type="button"
                   class="dropdown-item split"
-                  class:selected={reasoningEffort === option.value}
+                  class:selected={reasoningEffort === option}
                   onclick={() => {
-                    onReasoningChange(option.value);
+                    onReasoningChange(option);
                     reasoningOpen = false;
                   }}
                 >
-                  {option.label}
-                  {#if reasoningEffort === option.value}
+                  {reasoningLabel(option)}
+                  {#if reasoningEffort === option}
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                       <polyline points="20 6 9 17 4 12"/>
                     </svg>
@@ -333,20 +335,20 @@
                 <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
                 <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
               </svg>
-              <span>Plan</span>
+              <span>{i18n.t("prompt.mode.plan")}</span>
             {:else}
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="16 18 22 12 16 6"/>
                 <polyline points="8 6 2 12 8 18"/>
               </svg>
-              <span>Code</span>
+              <span>{i18n.t("prompt.mode.code")}</span>
             {/if}
           </button>
         {/if}
       </div>
 
       {#if disabled && onStop}
-        <button type="button" class="stop-btn row" onclick={onStop} title="Stop">
+        <button type="button" class="stop-btn row" onclick={onStop} title={i18n.t("common.stop")}>
           <svg viewBox="0 0 24 24" fill="currentColor">
             <rect x="6" y="6" width="12" height="12" rx="1"/>
           </svg>

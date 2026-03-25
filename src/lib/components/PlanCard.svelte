@@ -2,6 +2,7 @@
   import { marked } from "marked";
   import DOMPurify from "dompurify";
   import type { Message } from "../types";
+  import { i18n } from "../i18n.svelte";
 
   interface Props {
     message: Message;
@@ -48,7 +49,7 @@
         <path d="M9 14h6"/>
         <path d="M9 18h6"/>
       </svg>
-      <span class="header-label">Proposed Plan</span>
+      <span class="header-label">{i18n.t("planCard.header")}</span>
     </span>
     <svg
       class="chevron"
@@ -70,7 +71,7 @@
 
   <div class="card-footer">
     {#if !latest}
-      <span class="status-badge muted">Plan</span>
+      <span class="status-badge muted">{i18n.t("planCard.status.plan")}</span>
     {:else if status === "pending"}
       <button
         type="button"
@@ -78,11 +79,11 @@
         {disabled}
         onclick={handleApprove}
       >
-        Approve
+        {i18n.t("planCard.approve")}
       </button>
-      <span class="footer-hint">or reply with changes</span>
+      <span class="footer-hint">{i18n.t("planCard.footerHint")}</span>
     {:else}
-      <span class="status-badge">Approved</span>
+      <span class="status-badge">{i18n.t("planCard.status.approved")}</span>
     {/if}
   </div>
 </div>

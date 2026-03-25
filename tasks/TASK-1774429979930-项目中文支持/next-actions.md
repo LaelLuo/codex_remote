@@ -2,12 +2,33 @@
 
 ## Open
 
-- NA-1774435556683 规划第二阶段范围，优先处理 Thread/Device 页面与剩余主流程英文文案。
+- NA-1774448460438 规划第三阶段范围，优先处理 ProjectPicker / WorktreeModal 与其余共享辅助组件的剩余英文文案。
   - status: open
-  - created_at: 2026-03-25T10:45:56.683Z
+  - created_at: 2026-03-25T19:41:00.4388268+08:00
   - source: agent
 
 ## Closed
+
+- NA-1774447837000 等待人工复查本轮返修，确认第二阶段可收口并进入下一批页面翻译。
+  - status: done
+  - created_at: 2026-03-25T11:30:37.000Z
+  - closed_at: 2026-03-25T19:41:00.4388268+08:00
+  - closed_by: agent
+  - source: agent
+
+- NA-1774447572000 跟进人工 review 结果，按反馈继续收敛第二阶段遗漏文案与边界。
+  - status: done
+  - created_at: 2026-03-25T11:26:12.000Z
+  - closed_at: 2026-03-25T11:30:37.000Z
+  - closed_by: agent
+  - source: agent
+
+- NA-1774435556683 规划第二阶段范围，优先处理 Thread/Device 页面与剩余主流程英文文案。
+  - status: done
+  - created_at: 2026-03-25T10:45:56.683Z
+  - closed_at: 2026-03-25T11:26:12.000Z
+  - closed_by: agent
+  - source: agent
 
 - NA-1774430026424 确定第一阶段的优先范围与验收标准。
   - status: done

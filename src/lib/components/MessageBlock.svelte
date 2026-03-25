@@ -3,6 +3,7 @@
   import DOMPurify from "dompurify";
   import type { Message } from "../types";
   import { MAX_MARKDOWN_RENDER_CHARS } from "../message-limits";
+  import { i18n } from "../i18n.svelte";
   import ShimmerDot from "./ShimmerDot.svelte";
   import Reasoning from "./Reasoning.svelte";
   import Tool from "./Tool.svelte";
@@ -75,7 +76,7 @@
   {:else if isCompaction}
     <div class="message-line compaction row">
       <span class="compaction-icon">↕</span>
-      <span class="text dim">Context compacted</span>
+      <span class="text dim">{i18n.t("message.contextCompacted")}</span>
     </div>
   {:else if isTerminal}
     <div class="message-line terminal row">

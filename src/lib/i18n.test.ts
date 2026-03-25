@@ -141,4 +141,22 @@ describe("i18n store", () => {
     expect(i18n.themeName("dark")).toBe("深色");
     expect(i18n.t("common.themeTitle", { theme: i18n.themeName("system") })).toBe("主题：跟随系统");
   });
+
+  test("translates prompt mode labels", async () => {
+    const { i18n } = await loadI18n();
+    expect(i18n.t("prompt.mode.code")).toBe("Code");
+    expect(i18n.t("prompt.mode.plan")).toBe("Plan");
+
+    i18n.set("zh-CN");
+    expect(i18n.t("prompt.mode.code")).toBe("代码");
+    expect(i18n.t("prompt.mode.plan")).toBe("规划");
+  });
+
+  test("translates review tool title in both locales", async () => {
+    const { i18n } = await loadI18n();
+    expect(i18n.t("tool.title.review")).toBe("Review");
+
+    i18n.set("zh-CN");
+    expect(i18n.t("tool.title.review")).toBe("审查");
+  });
 });

@@ -1,6 +1,7 @@
 <script lang="ts">
   import ShimmerDot from "./ShimmerDot.svelte";
   import type { PlanStep } from "../types";
+  import { i18n } from "../i18n.svelte";
 
   interface Props {
     detail?: string | null;
@@ -39,7 +40,7 @@
 <div class="working-status">
   <div class="status-line row">
     <ShimmerDot color="var(--cli-prefix-agent)" />
-    <span class="label">Working</span>
+    <span class="label">{i18n.t("working.label")}</span>
     {#if currentStep}
       <span class="detail">{currentStep}</span>
     {/if}

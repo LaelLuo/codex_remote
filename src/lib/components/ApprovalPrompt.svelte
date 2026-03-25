@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { ApprovalRequest } from "../types";
+  import { i18n } from "../i18n.svelte";
 
   interface Props {
     approval: ApprovalRequest;
@@ -12,25 +13,25 @@
 
   let selectedIndex = $state(0);
 
-  const options = [
-    { key: "Y", label: "Yes, proceed", action: () => onApprove(false) },
-    { key: "A", label: "Always for session", action: () => onApprove(true) },
-    { key: "N", label: "Decline", action: () => onDecline() },
-    { key: "Esc", label: "Cancel turn", action: () => onCancel() },
-  ];
+  const options = $derived.by(() => [
+    { key: "Y", label: i18n.t("approval.option.proceed"), action: () => onApprove(false) },
+    { key: "A", label: i18n.t("approval.option.alwaysSession"), action: () => onApprove(true) },
+    { key: "N", label: i18n.t("approval.option.decline"), action: () => onDecline() },
+    { key: "Esc", label: i18n.t("approval.option.cancelTurn"), action: () => onCancel() },
+  ]);
 
-  const actionLabels: Record<ApprovalRequest["type"], string> = {
-    command: "Run shell command",
-    file: "Modify file",
-    mcp: "Run MCP tool",
-    other: "Perform action",
-  };
+  const actionLabels = $derived.by(() => ({
+    command: i18n.t("approval.action.command"),
+    file: i18n.t("approval.action.file"),
+    mcp: i18n.t("approval.action.mcp"),
+    other: i18n.t("approval.action.other"),
+  }));
 
-  const statusLabels: Record<string, { text: string; color: string }> = {
-    approved: { text: "Approved", color: "var(--cli-success)" },
-    declined: { text: "Declined", color: "var(--cli-error)" },
-    cancelled: { text: "Cancelled", color: "var(--cli-text-muted)" },
-  };
+  const statusLabels = $derived.by(() => ({
+    approved: { text: i18n.t("approval.status.approved"), color: "var(--cli-success)" },
+    declined: { text: i18n.t("approval.status.declined"), color: "var(--cli-error)" },
+    cancelled: { text: i18n.t("approval.status.cancelled"), color: "var(--cli-text-muted)" },
+  }));
 
   function handleOptionClick(index: number) {
     if (approval.status !== "pending") return;
@@ -73,7 +74,7 @@
 
 <div class="approval-card" class:resolved={approval.status !== "pending"}>
   <div class="card-header">
-    <span class="header-label">Approval Required</span>
+    <span class="header-label">{i18n.t("approval.header")}</span>
     <span class="header-type">{actionLabels[approval.type]}</span>
   </div>
 

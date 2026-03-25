@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
   import { socket } from "../socket.svelte";
+  import { i18n, type TranslationParams } from "../i18n.svelte";
   import type { GitStatusResult } from "../types";
 
   type Props = {
@@ -19,37 +20,66 @@
     onResolvedRepoPath,
   }: Props = $props();
 
+  type UiMessage =
+    | { kind: "key"; key: string; params?: TranslationParams }
+    | { kind: "text"; text: string }
+    | { kind: "parts"; parts: UiMessage[] };
+
   let repoPath = $state("");
   let status = $state<GitStatusResult | null>(null);
   let selectedPaths = $state<Set<string>>(new Set());
   let loading = $state(false);
-  let error = $state<string | null>(null);
+  let error = $state<UiMessage | null>(null);
   let commitMessage = $state("");
   let commitBusy = $state(false);
   let pushBusy = $state(false);
   let revertBusy = $state(false);
   let pushAfterCommit = $state(false);
-  let actionMessage = $state<string | null>(null);
+  let actionMessage = $state<UiMessage | null>(null);
 
   let activeView = $state<"changes" | "history">("changes");
 
   let selectedDiffPath = $state<string | null>(null);
   let diffText = $state("");
   let diffLoading = $state(false);
-  let diffError = $state<string | null>(null);
+  let diffError = $state<UiMessage | null>(null);
   let diffIsBinary = $state(false);
   let diffTooLarge = $state(false);
   let diffRequestId = 0;
 
   let graphText = $state("");
   let graphLoading = $state(false);
-  let graphError = $state<string | null>(null);
+  let graphError = $state<UiMessage | null>(null);
   let graphTruncated = $state(false);
   let graphRequestId = 0;
 
   let initialAutoLoadedPath = "";
   let lastAutoRefreshSignature = "";
   let autoRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function messageKey(key: string, params?: TranslationParams): UiMessage {
+    return { kind: "key", key, ...(params ? { params } : {}) };
+  }
+
+  function messageText(text: string): UiMessage {
+    return { kind: "text", text };
+  }
+
+  function messageParts(parts: UiMessage[]): UiMessage {
+    return { kind: "parts", parts };
+  }
+
+  function renderMessage(message: UiMessage | null): string {
+    if (!message) return "";
+    if (message.kind === "parts") {
+      return message.parts
+        .map((part) => renderMessage(part))
+        .filter((part) => part.trim().length > 0)
+        .join("\n\n");
+    }
+    if (message.kind === "text") return message.text;
+    return i18n.t(message.key, message.params);
+  }
 
   const isBusy = $derived(loading || commitBusy || pushBusy || revertBusy);
   const selectedCount = $derived(selectedPaths.size);
@@ -155,7 +185,7 @@
       status = null;
       selectedPaths = new Set();
       if (!silent) {
-        error = "Set absolute file or repository path first.";
+        error = messageKey("git.error.setPathFirst");
       }
       return;
     }
@@ -185,7 +215,7 @@
     } catch (err) {
       status = null;
       selectedPaths = new Set();
-      error = err instanceof Error ? err.message : "Failed to read git status.";
+      error = err instanceof Error ? messageText(err.message) : messageKey("git.error.readStatusFailed");
     } finally {
       loading = false;
     }
@@ -202,7 +232,7 @@
     const silent = options?.silent === true;
     const repoRoot = options?.repoRoot?.trim() || status?.repoRoot?.trim();
     if (!repoRoot) {
-      if (!silent) error = "Refresh status first to resolve repository root.";
+      if (!silent) error = messageKey("git.error.refreshFirstResolveRoot");
       return;
     }
 
@@ -226,7 +256,7 @@
       diffText = "";
       diffIsBinary = false;
       diffTooLarge = false;
-      diffError = err instanceof Error ? err.message : "Failed to load file diff.";
+      diffError = err instanceof Error ? messageText(err.message) : messageKey("git.error.loadDiffFailed");
     } finally {
       if (requestId === diffRequestId) {
         diffLoading = false;
@@ -238,7 +268,7 @@
     const silent = options?.silent === true;
     const repoRoot = options?.repoRoot?.trim() || await ensureRepoRoot();
     if (!repoRoot) {
-      if (!silent) error = "Refresh status first to resolve repository root.";
+      if (!silent) error = messageKey("git.error.refreshFirstResolveRoot");
       return;
     }
 
@@ -259,7 +289,7 @@
       if (requestId !== graphRequestId) return;
       graphText = "";
       graphTruncated = false;
-      graphError = err instanceof Error ? err.message : "Failed to load git graph.";
+      graphError = err instanceof Error ? messageText(err.message) : messageKey("git.error.loadGraphFailed");
     } finally {
       if (requestId === graphRequestId) {
         graphLoading = false;
@@ -303,17 +333,17 @@
   async function commitSelected(): Promise<void> {
     const repoRoot = status?.repoRoot?.trim();
     if (!repoRoot) {
-      error = "Refresh status first to resolve repository root.";
+      error = messageKey("git.error.refreshFirstResolveRoot");
       return;
     }
     if (!commitMessage.trim()) {
-      error = "Commit message is required.";
+      error = messageKey("git.error.commitMessageRequired");
       return;
     }
 
     const selected = getSelectedEntryPaths();
     if (selected.length === 0) {
-      error = "Select at least one file to commit.";
+      error = messageKey("git.error.selectAtLeastOneCommit");
       return;
     }
 
@@ -329,16 +359,22 @@
         anchorId,
         allSelectedNow ? undefined : selected,
       );
-      let combinedOutput = commitResult.output || "Committed.";
+      const committedMessage: UiMessage = commitResult.output
+        ? messageText(commitResult.output)
+        : messageKey("git.action.committed");
       if (pushAfterCommit) {
         const pushResult = await socket.gitPush(repoRoot, undefined, undefined, anchorId);
-        combinedOutput = `${combinedOutput}\n\n${pushResult.output || "Pushed."}`.trim();
+        const pushedMessage: UiMessage = pushResult.output
+          ? messageText(pushResult.output)
+          : messageKey("git.action.pushed");
+        actionMessage = messageParts([committedMessage, pushedMessage]);
+      } else {
+        actionMessage = committedMessage;
       }
       commitMessage = "";
-      actionMessage = combinedOutput;
       await refreshStatus({ silent: true, keepActionMessage: true });
     } catch (err) {
-      error = err instanceof Error ? err.message : "Commit failed.";
+      error = err instanceof Error ? messageText(err.message) : messageKey("git.error.commitFailed");
     } finally {
       commitBusy = false;
     }
@@ -347,7 +383,7 @@
   async function pushChanges(): Promise<void> {
     const repoRoot = status?.repoRoot?.trim();
     if (!repoRoot) {
-      error = "Refresh status first to resolve repository root.";
+      error = messageKey("git.error.refreshFirstResolveRoot");
       return;
     }
 
@@ -356,10 +392,10 @@
     actionMessage = null;
     try {
       const result = await socket.gitPush(repoRoot, undefined, undefined, anchorId);
-      actionMessage = result.output || "Pushed.";
+      actionMessage = result.output ? messageText(result.output) : messageKey("git.action.pushed");
       await refreshStatus({ silent: true, keepActionMessage: true });
     } catch (err) {
-      error = err instanceof Error ? err.message : "Push failed.";
+      error = err instanceof Error ? messageText(err.message) : messageKey("git.error.pushFailed");
     } finally {
       pushBusy = false;
     }
@@ -368,26 +404,28 @@
   async function revertSelected(): Promise<void> {
     const repoRoot = status?.repoRoot?.trim();
     if (!repoRoot) {
-      error = "Refresh status first to resolve repository root.";
+      error = messageKey("git.error.refreshFirstResolveRoot");
       return;
     }
 
     const selected = getSelectedEntryPaths();
     if (selected.length === 0) {
-      error = "Select at least one file to revert.";
+      error = messageKey("git.error.selectAtLeastOneRevert");
       return;
     }
-    if (!confirm(`Revert selected changes in ${selected.length} file(s)?`)) return;
+    if (!confirm(i18n.t("git.confirm.revertSelected", { count: selected.length }))) return;
 
     revertBusy = true;
     error = null;
     actionMessage = null;
     try {
       const result = await socket.gitRevert(repoRoot, anchorId, selected);
-      actionMessage = result.output || `Reverted ${result.reverted} file(s).`;
+      actionMessage = result.output
+        ? messageText(result.output)
+        : messageKey("git.action.revertedCount", { count: result.reverted });
       await refreshStatus({ silent: true, keepActionMessage: true });
     } catch (err) {
-      error = err instanceof Error ? err.message : "Revert failed.";
+      error = err instanceof Error ? messageText(err.message) : messageKey("git.error.revertFailed");
     } finally {
       revertBusy = false;
     }
@@ -396,20 +434,20 @@
   async function revertSingle(path: string): Promise<void> {
     const repoRoot = status?.repoRoot?.trim();
     if (!repoRoot) {
-      error = "Refresh status first to resolve repository root.";
+      error = messageKey("git.error.refreshFirstResolveRoot");
       return;
     }
-    if (!confirm(`Revert changes in ${path}?`)) return;
+    if (!confirm(i18n.t("git.confirm.revertPath", { path }))) return;
 
     revertBusy = true;
     error = null;
     actionMessage = null;
     try {
       const result = await socket.gitRevert(repoRoot, anchorId, [path]);
-      actionMessage = result.output || `Reverted ${path}.`;
+      actionMessage = result.output ? messageText(result.output) : messageKey("git.action.revertedPath", { path });
       await refreshStatus({ silent: true, keepActionMessage: true });
     } catch (err) {
-      error = err instanceof Error ? err.message : "Revert failed.";
+      error = err instanceof Error ? messageText(err.message) : messageKey("git.error.revertFailed");
     } finally {
       revertBusy = false;
     }
@@ -418,20 +456,20 @@
   async function revertAll(): Promise<void> {
     const repoRoot = status?.repoRoot?.trim();
     if (!repoRoot) {
-      error = "Refresh status first to resolve repository root.";
+      error = messageKey("git.error.refreshFirstResolveRoot");
       return;
     }
-    if (!confirm("Revert all local changes and remove all untracked files?")) return;
+    if (!confirm(i18n.t("git.confirm.revertAll"))) return;
 
     revertBusy = true;
     error = null;
     actionMessage = null;
     try {
       const result = await socket.gitRevert(repoRoot, anchorId);
-      actionMessage = result.output || "All changes reverted.";
+      actionMessage = result.output ? messageText(result.output) : messageKey("git.action.revertedAll");
       await refreshStatus({ silent: true, keepActionMessage: true });
     } catch (err) {
-      error = err instanceof Error ? err.message : "Revert all failed.";
+      error = err instanceof Error ? messageText(err.message) : messageKey("git.error.revertAllFailed");
     } finally {
       revertBusy = false;
     }
@@ -441,14 +479,14 @@
 <section class="git-panel stack" aria-live="polite">
   <header class="panel-head row">
     <div class="panel-title-wrap stack">
-      <span class="panel-kicker">Thread data</span>
-      <h2>Git Changes</h2>
+      <span class="panel-kicker">{i18n.t("git.panelKicker")}</span>
+      <h2>{i18n.t("git.title")}</h2>
       {#if threadId}
-        <p class="panel-subtle">Thread {threadId.slice(0, 8)}</p>
+        <p class="panel-subtle">{i18n.t("git.threadLabel", { id: threadId.slice(0, 8) })}</p>
       {/if}
     </div>
     <button type="button" class="refresh-btn" onclick={() => void refreshStatus()} disabled={isBusy}>
-      {loading ? "Refreshing..." : "Refresh"}
+      {loading ? i18n.t("git.refreshing") : i18n.t("git.refresh")}
     </button>
   </header>
 
@@ -456,7 +494,7 @@
     <input
       class="path-input"
       type="text"
-      placeholder="D:\\project\\repo (or absolute file path)"
+      placeholder={i18n.t("git.pathPlaceholder")}
       bind:value={repoPath}
       onkeydown={(e) => {
         if (e.key === "Enter") void refreshStatus();
@@ -466,19 +504,19 @@
 
   {#if status}
     <div class="status-line row">
-      <span class="chip">{status.clean ? "clean" : "dirty"}</span>
-      <span class="chip">{status.branch ? `branch ${status.branch}` : "detached"}</span>
+      <span class="chip">{status.clean ? i18n.t("git.status.clean") : i18n.t("git.status.dirty")}</span>
+      <span class="chip">{status.branch ? i18n.t("git.status.branch", { branch: status.branch }) : i18n.t("git.status.detached")}</span>
       <span class="chip">{status.repoRoot}</span>
-      <span class="chip">changes {status.entries.length}</span>
-      <span class="chip">selected {selectedCount}</span>
+      <span class="chip">{i18n.t("git.status.changes", { count: status.entries.length })}</span>
+      <span class="chip">{i18n.t("git.status.selected", { count: selectedCount })}</span>
     </div>
 
     <div class="view-tabs row">
       <button type="button" class="tab-btn" class:active={activeView === "changes"} onclick={() => setView("changes")}>
-        Changes
+        {i18n.t("git.tab.changes")}
       </button>
       <button type="button" class="tab-btn" class:active={activeView === "history"} onclick={() => setView("history")}>
-        History
+        {i18n.t("git.tab.history")}
       </button>
     </div>
 
@@ -492,13 +530,13 @@
               onchange={(e) => setAllSelected((e.currentTarget as HTMLInputElement).checked)}
               disabled={isBusy}
             />
-            <span>Select all</span>
+            <span>{i18n.t("git.selectAll")}</span>
           </label>
           <button type="button" class="mini-btn danger" onclick={() => void revertSelected()} disabled={isBusy || selectedCount === 0}>
-            Revert selected
+            {i18n.t("git.revertSelected")}
           </button>
           <button type="button" class="mini-btn danger" onclick={() => void revertAll()} disabled={isBusy}>
-            Revert all
+            {i18n.t("git.revertAll")}
           </button>
         </div>
 
@@ -517,10 +555,10 @@
               <span class="entry-path">{entry.path}</span>
               <div class="entry-actions row">
                 <button type="button" class="entry-diff-btn" onclick={() => void loadFileDiff(entry.path)} disabled={isBusy}>
-                  Diff
+                  {i18n.t("git.diff")}
                 </button>
                 <button type="button" class="entry-revert-btn" onclick={() => void revertSingle(entry.path)} disabled={isBusy}>
-                  Revert
+                  {i18n.t("git.revert")}
                 </button>
               </div>
             </div>
@@ -529,22 +567,22 @@
 
         <div class="diff-preview stack">
           <div class="diff-preview-head row">
-            <span class="chip">{selectedDiffPath ? selectedDiffPath : "select file for diff"}</span>
+            <span class="chip">{selectedDiffPath ? selectedDiffPath : i18n.t("git.selectFileForDiff")}</span>
             {#if diffIsBinary}
-              <span class="chip">binary</span>
+              <span class="chip">{i18n.t("git.binary")}</span>
             {/if}
             {#if diffTooLarge}
-              <span class="chip">truncated</span>
+              <span class="chip">{i18n.t("git.truncated")}</span>
             {/if}
           </div>
           {#if diffLoading}
-            <p class="hint">Loading diff...</p>
+            <p class="hint">{i18n.t("git.loadingDiff")}</p>
           {:else if diffError}
-            <p class="hint hint-error">{diffError}</p>
+            <p class="hint hint-error">{renderMessage(diffError)}</p>
           {:else if selectedDiffPath}
-            <pre class="diff-output">{diffText || "No diff payload for this path."}</pre>
+            <pre class="diff-output">{diffText || i18n.t("git.noDiffPayloadPath")}</pre>
           {:else}
-            <p class="hint">Pick a file and press Diff to preview changes.</p>
+            <p class="hint">{i18n.t("git.pickFilePreview")}</p>
           {/if}
         </div>
 
@@ -552,7 +590,7 @@
           <input
             class="commit-input"
             type="text"
-            placeholder="Commit message"
+            placeholder={i18n.t("git.commitMessage")}
             bind:value={commitMessage}
             onkeydown={(e) => {
               if (e.key === "Enter" && !commitBusy) void commitSelected();
@@ -560,47 +598,47 @@
           />
           <label class="push-after row">
             <input type="checkbox" bind:checked={pushAfterCommit} disabled={isBusy} />
-            <span>Push after commit</span>
+            <span>{i18n.t("git.pushAfterCommit")}</span>
           </label>
           <div class="row action-buttons">
             <button type="button" class="action-btn" onclick={() => void commitSelected()} disabled={isBusy || selectedCount === 0}>
-              {commitBusy ? "Committing..." : "Commit Selected"}
+              {commitBusy ? i18n.t("git.committing") : i18n.t("git.commitSelected")}
             </button>
             <button type="button" class="action-btn" onclick={() => void pushChanges()} disabled={isBusy}>
-              {pushBusy ? "Pushing..." : "Push"}
+              {pushBusy ? i18n.t("git.pushing") : i18n.t("git.push")}
             </button>
           </div>
         </div>
       {:else}
-        <p class="hint">No local changes in this repository.</p>
+        <p class="hint">{i18n.t("git.noLocalChanges")}</p>
       {/if}
     {:else}
       <div class="history-toolbar row">
         <button type="button" class="mini-btn" onclick={() => void loadGitGraph()} disabled={graphLoading}>
-          {graphLoading ? "Loading..." : "Reload graph"}
+          {graphLoading ? i18n.t("common.loading") : i18n.t("git.reloadGraph")}
         </button>
       </div>
 
       {#if graphLoading && !graphText}
-        <p class="hint">Loading git graph...</p>
+        <p class="hint">{i18n.t("git.loadingGraph")}</p>
       {:else if graphError}
-        <p class="hint hint-error">{graphError}</p>
+        <p class="hint hint-error">{renderMessage(graphError)}</p>
       {:else if !graphText}
-        <p class="hint">No commits yet.</p>
+        <p class="hint">{i18n.t("git.noCommits")}</p>
       {:else}
         <pre class="graph-output">{graphText}</pre>
         {#if graphTruncated}
-          <p class="hint">Graph output truncated to latest commits.</p>
+          <p class="hint">{i18n.t("git.graphTruncated")}</p>
         {/if}
       {/if}
     {/if}
   {/if}
 
   {#if error}
-    <p class="hint hint-error">{error}</p>
+    <p class="hint hint-error">{renderMessage(error)}</p>
   {/if}
   {#if actionMessage}
-    <p class="hint">{actionMessage}</p>
+    <p class="hint">{renderMessage(actionMessage)}</p>
   {/if}
 </section>
 
