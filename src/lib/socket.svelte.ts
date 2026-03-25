@@ -50,6 +50,7 @@ function normalizeToken(token?: string | null): string | null {
 export interface SendResult {
   success: boolean;
   error?: string;
+  errorMessage?: SocketErrorMessage;
 }
 
 export interface ListDirsResult {
@@ -110,6 +111,15 @@ export class SocketRpcError extends Error {
 
 export function getSocketErrorMessage(error: unknown): SocketErrorMessage | null {
   if (error instanceof SocketRpcError) return error.uiMessage;
+  return null;
+}
+
+export function getSendResultErrorMessage(result: SendResult): SocketErrorMessage | null {
+  if (result.success) return null;
+  if (result.errorMessage) return result.errorMessage;
+  if (typeof result.error === "string" && result.error.trim()) {
+    return { kind: "text", text: result.error };
+  }
   return null;
 }
 
@@ -286,14 +296,29 @@ class SocketStore {
 
   send(message: RpcMessage): SendResult {
     if (!this.#socket || this.#socket.readyState !== WebSocket.OPEN) {
-      return { success: false, error: "Not connected" };
+      return {
+        success: false,
+        error: "Not connected",
+        errorMessage: { kind: "key", key: "socket.send.notConnected" },
+      };
     }
 
     try {
       this.#socket.send(JSON.stringify(message));
       return { success: true };
     } catch (e) {
-      return { success: false, error: e instanceof Error ? e.message : "Send failed" };
+      if (e instanceof Error && e.message.trim()) {
+        return {
+          success: false,
+          error: e.message,
+          errorMessage: { kind: "text", text: e.message },
+        };
+      }
+      return {
+        success: false,
+        error: "Send failed",
+        errorMessage: { kind: "key", key: "socket.send.failed" },
+      };
     }
   }
 
@@ -647,14 +672,29 @@ class SocketStore {
 
   #sendRaw(message: Record<string, unknown>): SendResult {
     if (!this.#socket || this.#socket.readyState !== WebSocket.OPEN) {
-      return { success: false, error: "Not connected" };
+      return {
+        success: false,
+        error: "Not connected",
+        errorMessage: { kind: "key", key: "socket.send.notConnected" },
+      };
     }
 
     try {
       this.#socket.send(JSON.stringify(message));
       return { success: true };
     } catch (e) {
-      return { success: false, error: e instanceof Error ? e.message : "Send failed" };
+      if (e instanceof Error && e.message.trim()) {
+        return {
+          success: false,
+          error: e.message,
+          errorMessage: { kind: "text", text: e.message },
+        };
+      }
+      return {
+        success: false,
+        error: "Send failed",
+        errorMessage: { kind: "key", key: "socket.send.failed" },
+      };
     }
   }
 

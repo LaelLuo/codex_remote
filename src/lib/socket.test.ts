@@ -84,6 +84,22 @@ describe("socket orbit handlers", () => {
 });
 
 describe("socket localized error descriptors", () => {
+  test("returns key descriptor for send when websocket is not connected", async () => {
+    const { socket } = await loadFreshSocketModule();
+
+    const result = socket.send({
+      id: "send-1",
+      method: "turn/start",
+      params: { threadId: "thread-1", input: [{ type: "text", text: "hello" }] },
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.errorMessage).toEqual({
+      kind: "key",
+      key: "socket.send.notConnected",
+    });
+  });
+
   test("stores key descriptor when URL is missing", async () => {
     const { socket } = await loadFreshSocketModule();
 

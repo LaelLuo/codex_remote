@@ -429,6 +429,8 @@ const en: MessageDict = {
   "socket.error.connectionLost": "Connection lost",
   "socket.error.failedToConnect": "Failed to connect",
   "socket.error.rpc": "RPC error",
+  "socket.send.notConnected": "Not connected",
+  "socket.send.failed": "Failed to send",
 
   "tool.title.command": "Command",
   "tool.title.file": "File Change",
@@ -872,6 +874,8 @@ const zhCN: MessageDict = {
   "socket.error.connectionLost": "连接已断开",
   "socket.error.failedToConnect": "连接失败",
   "socket.error.rpc": "RPC 错误",
+  "socket.send.notConnected": "未连接",
+  "socket.send.failed": "发送失败",
 
   "tool.title.command": "命令",
   "tool.title.file": "文件变更",

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { socket } from "../lib/socket.svelte";
+  import { getSendResultErrorMessage, socket } from "../lib/socket.svelte";
   import { getThreadStartErrorMessage, threads } from "../lib/threads.svelte";
   import { messages } from "../lib/messages.svelte";
   import { i18n, type TranslationParams } from "../lib/i18n.svelte";
@@ -217,7 +217,12 @@
     });
 
     if (result.success) return null;
-    if (result.error) return messageText(result.error);
+    const socketMessage = getSendResultErrorMessage(result);
+    if (socketMessage) {
+      return socketMessage.kind === "text"
+        ? messageText(socketMessage.text)
+        : messageKey(socketMessage.key, socketMessage.params);
+    }
     return messageKey("home.submitError.sendFailed");
   }
 
@@ -307,6 +312,17 @@
     ulwLoopRunner.stop(pane.threadId, "user_interrupt");
     const result = messages.interrupt(pane.threadId);
     if (!result.success) {
+      if (result.errorMessage) {
+        updatePane(
+          paneId,
+          {
+            submitError: result.errorMessage.kind === "text"
+              ? messageText(result.errorMessage.text)
+              : messageKey(result.errorMessage.key, result.errorMessage.params),
+          },
+        );
+        return;
+      }
       updatePane(
         paneId,
         { submitError: result.error ? messageText(result.error) : messageKey("home.submitError.stopTurnFailed") },

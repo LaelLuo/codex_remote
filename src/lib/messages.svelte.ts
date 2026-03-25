@@ -10,6 +10,7 @@ import type {
   UserInputRequest,
 } from "./types";
 import { socket } from "./socket.svelte";
+import type { SocketErrorMessage } from "./socket.svelte";
 import { threads } from "./threads.svelte";
 import { appendDeltaWithCap, keepRecentMessages } from "./message-limits";
 
@@ -155,7 +156,7 @@ class MessagesStore {
     return this.#streamingReasoningTextByThread.get(threadId) ?? "";
   }
 
-  interrupt(threadId: string): { success: boolean; error?: string } {
+  interrupt(threadId: string): { success: boolean; error?: string; errorMessage?: SocketErrorMessage } {
     const turnId = this.#turnIdByThread.get(threadId);
     const turnStatus = this.#turnStatusByThread.get(threadId) ?? null;
     if (!turnId || (turnStatus ?? "").toLowerCase() !== "inprogress") {
@@ -173,6 +174,11 @@ class MessagesStore {
 
     if (result.success) {
       this.#interruptPendingByThread.add(threadId);
+    }
+    if (result.success) return result;
+    if (result.errorMessage) return result;
+    if (result.error) {
+      return { ...result, errorMessage: { kind: "text", text: result.error } };
     }
     return result;
   }

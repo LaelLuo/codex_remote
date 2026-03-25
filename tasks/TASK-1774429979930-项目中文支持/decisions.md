@@ -8,3 +8,4 @@
 - 2026-03-25T12:20:37.000Z [agent] socket 连接错误采用 descriptor（key/text）而非纯字符串，三处页面消费在渲染层翻译；浏览器原生 reason 保留 text 直显，fallback 默认文案使用 key。
 - 2026-03-25T12:26:26.000Z [agent] RPC fallback 不在 socket 层翻译成文本，而是通过 `SocketRpcError.uiMessage` 保留 key/text 语义到 UI 消费层；仅在无法识别该错误类型时回退到 Error.message 文本。
 - 2026-03-25T20:54:33+08:00 [agent] Home 页 submitError 延续 descriptor/key 策略：状态层保存 `UiMessage`（key/text），threads 启动失败优先读取 `getThreadStartErrorMessage`，仅自由文本错误走 text，避免切换语言后旧提示不刷新。
+- 2026-03-26T02:00:04+08:00 [agent] `socket.send` fallback 改为携带 `errorMessage` descriptor（同时保留 `error` 兼容旧调用）；Home/Thread 与 `messages.interrupt` 优先消费 descriptor，真实异常 message 仍以 text 透传。

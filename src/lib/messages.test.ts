@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 
 const STORE_KEY = "__codex_remote_messages_store__";
+const socketSendMock = mock(() => ({ success: true as const }));
 
 async function loadFreshMessagesModule() {
   const cacheBust = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
@@ -13,10 +14,12 @@ beforeEach(() => {
     configurable: true,
     writable: true,
   });
+  socketSendMock.mockReset();
+  socketSendMock.mockImplementation(() => ({ success: true as const }));
   mock.module("./socket.svelte", () => ({
     socket: {
       onMessage: () => () => {},
-      send: () => ({ success: true }),
+      send: socketSendMock,
     },
   }));
   mock.module("./threads.svelte", () => ({
@@ -92,5 +95,24 @@ describe("messages turn terminal handling", () => {
     expect(fileMessage?.metadata?.linesAdded).toBe(2);
     expect(fileMessage?.metadata?.linesRemoved).toBe(1);
     expect(fileMessage?.metadata?.fileChanges?.[0]?.path).toBe("src/app.ts");
+  });
+
+  test("interrupt returns descriptor when socket send fails", async () => {
+    socketSendMock.mockReturnValueOnce({
+      success: false,
+      errorMessage: { kind: "key", key: "socket.send.notConnected" },
+    });
+    const { messages } = await loadFreshMessagesModule();
+    messages.handleMessage({
+      method: "turn/started",
+      params: { threadId: "thread-1", turn: { id: "turn-3", status: "InProgress" } },
+    });
+
+    const result = messages.interrupt("thread-1");
+    expect(result.success).toBe(false);
+    expect(result.errorMessage).toEqual({
+      kind: "key",
+      key: "socket.send.notConnected",
+    });
   });
 });

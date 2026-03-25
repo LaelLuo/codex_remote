@@ -2,7 +2,7 @@
     import { untrack } from "svelte";
     import type { ModeKind, ReasoningEffort, SandboxMode, TurnImageInput } from "../lib/types";
     import { route } from "../router";
-    import { socket } from "../lib/socket.svelte";
+    import { getSendResultErrorMessage, socket } from "../lib/socket.svelte";
     import { threads } from "../lib/threads.svelte";
     import { messages } from "../lib/messages.svelte";
     import { models } from "../lib/models.svelte";
@@ -238,8 +238,13 @@
         });
 
         if (!result.success) {
-            if (result.error) {
-                setSendErrorText(result.error);
+            const socketMessage = getSendResultErrorMessage(result);
+            if (socketMessage) {
+                if (socketMessage.kind === "text") {
+                    setSendErrorText(socketMessage.text);
+                } else {
+                    setSendErrorKey(socketMessage.key, socketMessage.params);
+                }
             } else {
                 setSendErrorKey("thread.error.sendFailed");
             }
@@ -332,7 +337,13 @@
         }
         const result = messages.interrupt(threadId);
         if (!result.success) {
-            if (result.error) {
+            if (result.errorMessage) {
+                if (result.errorMessage.kind === "text") {
+                    setSendErrorText(result.errorMessage.text);
+                } else {
+                    setSendErrorKey(result.errorMessage.key, result.errorMessage.params);
+                }
+            } else if (result.error) {
                 setSendErrorText(result.error);
             } else {
                 setSendErrorKey("thread.error.stopTurnFailed");

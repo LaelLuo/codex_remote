@@ -181,6 +181,8 @@ describe("i18n store", () => {
     expect(i18n.t("socket.error.connectionLost")).toBe("Connection lost");
     expect(i18n.t("socket.error.invalidUrl", { url: "bad" })).toBe("Invalid URL: bad");
     expect(i18n.t("socket.error.rpc")).toBe("RPC error");
+    expect(i18n.t("socket.send.notConnected")).toBe("Not connected");
+    expect(i18n.t("socket.send.failed")).toBe("Failed to send");
 
     i18n.set("zh-CN");
     expect(i18n.t("reasoning.thinking")).toBe("思考中...");
@@ -188,6 +190,8 @@ describe("i18n store", () => {
     expect(i18n.t("socket.error.connectionLost")).toBe("连接已断开");
     expect(i18n.t("socket.error.invalidUrl", { url: "bad" })).toBe("无效 URL：bad");
     expect(i18n.t("socket.error.rpc")).toBe("RPC 错误");
+    expect(i18n.t("socket.send.notConnected")).toBe("未连接");
+    expect(i18n.t("socket.send.failed")).toBe("发送失败");
   });
 
   test("translates thread start fallback labels", async () => {
