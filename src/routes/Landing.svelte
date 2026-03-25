@@ -1,6 +1,7 @@
 <script lang="ts">
   import { auth } from "../lib/auth.svelte";
   import { config } from "../lib/config.svelte";
+  import { i18n } from "../lib/i18n.svelte";
   import { theme } from "../lib/theme.svelte";
   import { pwa } from "../lib/pwa.svelte";
 
@@ -12,7 +13,7 @@
 </script>
 
 <svelte:head>
-  <title>Codex Remote</title>
+  <title>{i18n.t("landing.title")}</title>
 </svelte:head>
 
 <div class="landing stack">
@@ -24,18 +25,23 @@
       </div>
       <div class="header-actions">
         {#if pwa.canInstall && !pwa.isStandalone}
-          <button class="ghost-btn" type="button" onclick={() => pwa.install()}>Install app</button>
+          <button class="ghost-btn" type="button" onclick={() => pwa.install()}>{i18n.t("common.installApp")}</button>
         {/if}
         {#if isSignedIn && isLocalMode && !hasConfiguredUrl}
-          <a class="primary-btn" href="/settings">Configure connection</a>
+          <a class="primary-btn" href="/settings">{i18n.t("landing.configureConnection")}</a>
         {:else if isSignedIn}
-          <a class="primary-btn" href="/app">Go to app</a>
+          <a class="primary-btn" href="/app">{i18n.t("common.goToApp")}</a>
         {:else}
-          <a class="primary-btn" href="/login">Sign in</a>
+          <a class="primary-btn" href="/login">{i18n.t("common.signIn")}</a>
         {/if}
-        <button type="button" class="icon-btn" onclick={() => theme.cycle()} title="Theme: {theme.current}">
-          <span class="icon-glyph">{themeIcons[theme.current]}</span>
-        </button>
+          <button
+            type="button"
+            class="icon-btn"
+            onclick={() => theme.cycle()}
+            title={i18n.t("common.themeTitle", { theme: i18n.themeName(theme.current) })}
+          >
+            <span class="icon-glyph">{themeIcons[theme.current]}</span>
+          </button>
       </div>
     </header>
 
@@ -43,47 +49,49 @@
       <div class="hero-copy stack">
         <h1>
           <span class="hero-word">REMOTE</span>
-          <span class="hero-caption"><span class="hero-script">Codex workflows</span> from any browser</span>
+          <span class="hero-caption">
+            <span class="hero-script">{i18n.t("landing.heroCaptionScript")}</span> {i18n.t("landing.heroCaptionTail")}
+          </span>
         </h1>
         <p>
-          Codex Remote lets you start and supervise Codex CLI sessions running on your machine from any browser.
+          {i18n.t("landing.heroDescription")}
         </p>
         {#if isLocalMode && !hasConfiguredUrl}
           <div class="hero-actions row">
-            <a class="primary-btn" href="/settings">Configure Anchor URL</a>
+            <a class="primary-btn" href="/settings">{i18n.t("landing.configureAnchorUrl")}</a>
           </div>
-          <p class="local-mode-hint">Local mode active - no sign-in required</p>
+          <p class="local-mode-hint">{i18n.t("landing.localModeHint")}</p>
         {:else if isLocalMode && hasConfiguredUrl}
           <div class="hero-actions row">
-            <a class="primary-btn" href="/app">Go to app</a>
-            <a class="ghost-btn" href="/settings">Settings</a>
+            <a class="primary-btn" href="/app">{i18n.t("common.goToApp")}</a>
+            <a class="ghost-btn" href="/settings">{i18n.t("common.settings")}</a>
           </div>
-          <p class="local-mode-hint">Local mode active - no sign-in required</p>
+          <p class="local-mode-hint">{i18n.t("landing.localModeHint")}</p>
         {:else if !isSignedIn}
           <div class="hero-actions row">
-            <a class="primary-btn" href="/login">Sign in</a>
-            <a class="ghost-btn" href="/register">Create account</a>
+            <a class="primary-btn" href="/login">{i18n.t("common.signIn")}</a>
+            <a class="ghost-btn" href="/register">{i18n.t("landing.createAccount")}</a>
           </div>
         {/if}
       </div>
     </main>
 
-    <div class="features-lead">Field notes</div>
+    <div class="features-lead">{i18n.t("landing.fieldNotes")}</div>
     <section class="features">
       <div class="feature">
         <span class="feature-index">01</span>
         <span class="feature-label">Anchor</span>
-        <p>A lightweight daemon that spawns and manages Codex CLI sessions. Your code stays local.</p>
+        <p>{i18n.t("landing.feature.anchor")}</p>
       </div>
       <div class="feature">
         <span class="feature-index">02</span>
         <span class="feature-label">Orbit</span>
-        <p>A Cloudflare relay that links your browser to Anchor over secure outbound tunnels.</p>
+        <p>{i18n.t("landing.feature.orbit")}</p>
       </div>
       <div class="feature">
         <span class="feature-index">03</span>
         <span class="feature-label">Handheld</span>
-        <p>Approve writes, review diffs, and control long-running tasks from a phone.</p>
+        <p>{i18n.t("landing.feature.handheld")}</p>
       </div>
     </section>
   </div>

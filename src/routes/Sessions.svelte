@@ -1,6 +1,7 @@
 <script lang="ts">
   import { socket } from "../lib/socket.svelte";
   import { threads } from "../lib/threads.svelte";
+  import { i18n } from "../lib/i18n.svelte";
   import { theme } from "../lib/theme.svelte";
   import AppHeader from "../lib/components/AppHeader.svelte";
   import ShimmerDot from "../lib/components/ShimmerDot.svelte";
@@ -10,7 +11,7 @@
   function formatTime(ts?: number): string {
     if (!ts) return "";
     const date = new Date(ts * 1000);
-    return date.toLocaleDateString(undefined, {
+    return i18n.formatDate(date, {
       month: "short",
       day: "numeric",
       hour: "2-digit",
@@ -26,14 +27,18 @@
 </script>
 
 <svelte:head>
-  <title>Codex Remote · Sessions</title>
+  <title>{i18n.t("sessions.title")}</title>
 </svelte:head>
 
 <div class="sessions stack">
   <AppHeader status={socket.status}>
     {#snippet actions()}
-      <a href="/settings">Settings</a>
-      <button type="button" onclick={() => theme.cycle()} title="Theme: {theme.current}">
+      <a href="/settings">{i18n.t("sessions.settingsLink")}</a>
+      <button
+        type="button"
+        onclick={() => theme.cycle()}
+        title={i18n.t("common.themeTitle", { theme: i18n.themeName(theme.current) })}
+      >
         {themeIcons[theme.current]}
       </button>
     {/snippet}
@@ -41,39 +46,39 @@
 
   <main class="sessions-content stack">
     <section class="masthead">
-      <span class="section-title">All sessions</span>
-      <h1>Sessions</h1>
+      <span class="section-title">{i18n.t("sessions.allSessions")}</span>
+      <h1>{i18n.t("sessions.heading")}</h1>
     </section>
 
     <section class="workspace stack">
       <div class="section-header split">
         <div class="section-title-row row">
-          <span class="section-subtitle">History</span>
+          <span class="section-subtitle">{i18n.t("sessions.history")}</span>
         </div>
         <div class="section-actions row">
-          <button class="refresh-btn" onclick={() => threads.fetch()} title="Refresh">↻</button>
+          <button class="refresh-btn" onclick={() => threads.fetch()} title={i18n.t("common.refresh")}>↻</button>
         </div>
       </div>
 
       {#if threads.loading}
         <div class="loading row">
-          <ShimmerDot /> Loading sessions...
+          <ShimmerDot /> {i18n.t("sessions.loading")}
         </div>
       {:else if threads.list.length === 0}
-        <div class="empty row">No sessions yet. Start one from Home.</div>
+        <div class="empty row">{i18n.t("sessions.empty")}</div>
       {:else}
         <ul class="session-list">
           {#each threads.list as thread (thread.id)}
             <li class="session-item row">
               <a class="session-link row" href="/thread/{thread.id}">
                 <span class="session-icon">›</span>
-                <span class="session-preview">{thread.preview || "New session"}</span>
+                <span class="session-preview">{thread.preview || i18n.t("common.newSession")}</span>
                 <span class="session-meta">{formatTime(thread.createdAt)}</span>
               </a>
               <button
                 class="archive-btn"
                 onclick={() => threads.archive(thread.id)}
-                title="Archive session"
+                title={i18n.t("sessions.archiveTitle")}
               >×</button>
             </li>
           {/each}

@@ -2,6 +2,7 @@
     import type { Snippet } from "svelte";
     import type { ConnectionStatus, SandboxMode } from "../types";
     import { anchors } from "../anchors.svelte";
+    import { i18n } from "../i18n.svelte";
 
     interface Props {
         status: ConnectionStatus;
@@ -16,14 +17,16 @@
     let sandboxOpen = $state(false);
     let mobileMenuOpen = $state(false);
 
-    const sandboxOptions: { value: SandboxMode; label: string }[] = [
-        { value: "read-only", label: "Read Only" },
-        { value: "workspace-write", label: "Workspace" },
-        { value: "danger-full-access", label: "Full Access" },
-    ];
+    const sandboxOptions: SandboxMode[] = ["read-only", "workspace-write", "danger-full-access"];
 
-    const selectedSandbox = $derived(sandboxOptions.find((s) => s.value === sandbox) || sandboxOptions[1]);
+    const selectedSandbox = $derived(sandboxOptions.find((value) => value === sandbox) ?? "workspace-write");
     const showAnchorAlert = $derived(status === "connected" && anchors.status === "none");
+
+    function sandboxLabel(value: SandboxMode): string {
+        if (value === "read-only") return i18n.t("appHeader.sandbox.readOnly");
+        if (value === "danger-full-access") return i18n.t("appHeader.sandbox.fullAccess");
+        return i18n.t("appHeader.sandbox.workspace");
+    }
 
     function handleClickOutside(e: MouseEvent) {
         const target = e.target as HTMLElement;
@@ -53,7 +56,7 @@
 
         {#if showAnchorAlert}
             <span class="separator">·</span>
-            <a class="anchor-alert anchor-alert-link" href="/device">Authorize device</a>
+            <a class="anchor-alert anchor-alert-link" href="/device">{i18n.t("appHeader.anchorAuthorize")}</a>
         {/if}
 
         {#if sandbox && onSandboxChange}
@@ -71,7 +74,7 @@
                     <svg class="shield-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
                     </svg>
-                    <span class="sandbox-label">{selectedSandbox.label}</span>
+                    <span class="sandbox-label">{sandboxLabel(selectedSandbox)}</span>
                     <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="m6 9 6 6 6-6" />
                     </svg>
@@ -82,15 +85,15 @@
                             <button
                                 type="button"
                                 class="sandbox-item split"
-                                class:selected={sandbox === option.value}
-                                class:danger={option.value === "danger-full-access"}
+                                class:selected={sandbox === option}
+                                class:danger={option === "danger-full-access"}
                                 onclick={() => {
-                                    onSandboxChange(option.value);
+                                    onSandboxChange(option);
                                     sandboxOpen = false;
                                 }}
                             >
-                                <span>{option.label}</span>
-                                {#if sandbox === option.value}
+                                <span>{sandboxLabel(option)}</span>
+                                {#if sandbox === option}
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                                         <polyline points="20 6 9 17 4 12" />
                                     </svg>
@@ -116,7 +119,7 @@
                     e.stopPropagation();
                     mobileMenuOpen = !mobileMenuOpen;
                 }}
-                aria-label="Menu"
+                aria-label={i18n.t("appHeader.menu")}
                 aria-expanded={mobileMenuOpen}
             >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

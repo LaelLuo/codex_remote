@@ -1,6 +1,7 @@
 <script lang="ts">
     import type { Snippet } from "svelte";
     import { auth } from "../auth.svelte";
+    import { i18n } from "../i18n.svelte";
     import { route } from "../../router";
     import { navigate } from "../../router";
 
@@ -17,13 +18,13 @@
 
 {#if auth.status === "loading"}
     <div class="auth-shell">
-        <div class="auth-status">Checking session...</div>
+        <div class="auth-status">{i18n.t("auth.gate.checkingSession")}</div>
     </div>
 {:else if auth.status === "signed_in" || isPublic}
     {@render children()}
 {:else}
     <div class="auth-shell">
-        <div class="auth-status">Redirecting...</div>
+        <div class="auth-status">{i18n.t("auth.gate.redirecting")}</div>
     </div>
 {/if}
 

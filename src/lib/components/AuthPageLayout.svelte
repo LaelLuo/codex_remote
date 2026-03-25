@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { Snippet } from "svelte";
+    import { i18n } from "../i18n.svelte";
     import { theme } from "../theme.svelte";
 
     const themeIcons = { system: "◐", light: "○", dark: "●" } as const;
@@ -16,7 +17,12 @@
             <span class="brand-main">CODEX</span>
             <span class="brand-accent">Remote</span>
           </a>
-          <button type="button" class="icon-btn" onclick={() => theme.cycle()} title="Theme: {theme.current}">
+          <button
+            type="button"
+            class="icon-btn"
+            onclick={() => theme.cycle()}
+            title={i18n.t("common.themeTitle", { theme: i18n.themeName(theme.current) })}
+          >
             <span class="icon-glyph">{themeIcons[theme.current]}</span>
           </button>
         </header>
@@ -34,11 +40,11 @@
     <div class="login-right">
         <div class="login-visual">
           <div class="visual-head">
-          <span class="visual-watermark">ACCESS</span>
+          <span class="visual-watermark">{i18n.t("auth.layout.visualWatermark")}</span>
         </div>
         <div class="visual-text">
-          <span class="visual-label">Remote control for your local Codex.</span>
-          <span class="visual-desc">Start and supervise Codex CLI sessions from any device.</span>
+          <span class="visual-label">{i18n.t("auth.layout.visualLabel")}</span>
+          <span class="visual-desc">{i18n.t("auth.layout.visualDesc")}</span>
         </div>
       </div>
     </div>

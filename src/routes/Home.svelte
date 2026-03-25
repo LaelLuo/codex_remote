@@ -2,6 +2,7 @@
   import { socket } from "../lib/socket.svelte";
   import { threads } from "../lib/threads.svelte";
   import { messages } from "../lib/messages.svelte";
+  import { i18n } from "../lib/i18n.svelte";
   import { theme } from "../lib/theme.svelte";
   import { models } from "../lib/models.svelte";
   import { anchors } from "../lib/anchors.svelte";
@@ -150,15 +151,15 @@
     imageInputs: TurnImageInput[] = [],
   ): string | null {
     const pane = getPane(paneId);
-    if (!pane) return "Pane not found";
+    if (!pane) return i18n.t("home.submitError.paneNotFound");
 
     const input = buildTurnInputItems(inputText, imageInputs);
-    if (input.length === 0) return "Input is empty";
+    if (input.length === 0) return i18n.t("home.submitError.inputEmpty");
 
     const selectedAnchorId = !auth.isLocalMode ? anchors.selectedId : null;
     if (!auth.isLocalMode) {
-      if (!selectedAnchorId) return "Select a device in Settings before sending messages.";
-      if (!anchors.selected) return "Selected device is offline. Choose another device in Settings.";
+      if (!selectedAnchorId) return i18n.t("home.submitError.selectDeviceBeforeSend");
+      if (!anchors.selected) return i18n.t("home.submitError.selectedDeviceOffline");
     }
 
     const params: Record<string, unknown> = {
@@ -180,7 +181,7 @@
       params,
     });
 
-    return result.success ? null : result.error ?? "Failed to send message";
+    return result.success ? null : result.error ?? i18n.t("home.submitError.sendFailed");
   }
 
   function handlePanePlanApprove(paneId: number, messageId: string) {
@@ -196,12 +197,12 @@
 
   function submitToExistingThread(paneId: number, rawInput: string, imageInputs: TurnImageInput[] = []): string | null {
     const pane = getPane(paneId);
-    if (!pane?.threadId) return "Session is not started for this window.";
+    if (!pane?.threadId) return i18n.t("home.submitError.sessionNotStarted");
 
     const normalizedInput = rawInput.trim();
-    if (!normalizedInput && imageInputs.length === 0) return "Input is empty";
+    if (!normalizedInput && imageInputs.length === 0) return i18n.t("home.submitError.inputEmpty");
     if (imageInputs.length > 0 && (normalizedInput.startsWith("/u") || normalizedInput.startsWith("!"))) {
-      return "Images can be sent with normal messages only.";
+      return i18n.t("home.submitError.imagesNormalOnly");
     }
 
     const ulwCommand = parseUlwCommand(normalizedInput);
@@ -221,7 +222,7 @@
         typeof ulwCommand.maxIterations !== "number" &&
         !ulwCommand.completionPromise
       ) {
-        return "Usage: /u config max=30 promise=DONE";
+        return i18n.t("home.submitError.ulwConfigUsage");
       }
       ulwRuntime.configure(pane.threadId, {
         maxIterations: ulwCommand.maxIterations,
@@ -233,7 +234,7 @@
     if (ulwCommand?.kind === "start") {
       const task =
         ulwCommand.task ?? pickUlwTaskFromMessages(messages.getThreadMessages(pane.threadId));
-      if (!task) return "Add task after /u for this window.";
+      if (!task) return i18n.t("home.submitError.addTaskAfterU");
       ulwLoopRunner.start(
         pane.threadId,
         {
@@ -249,7 +250,7 @@
     const bangCommand = parseBangTerminalCommand(normalizedInput);
     if (bangCommand) {
       if (!bangCommand.command) {
-        return "Usage: !<command> or !pwsh|cmd|bash|sh|zsh|fish <command>";
+        return i18n.t("home.submitError.bangUsage");
       }
       if (ulwRuntime.isActive(pane.threadId)) {
         ulwLoopRunner.stop(pane.threadId, "manual_user_input");
@@ -269,7 +270,7 @@
     ulwLoopRunner.stop(pane.threadId, "user_interrupt");
     const result = messages.interrupt(pane.threadId);
     if (!result.success) {
-      updatePane(paneId, { submitError: result.error ?? "Failed to stop turn" });
+      updatePane(paneId, { submitError: result.error ?? i18n.t("home.submitError.stopTurnFailed") });
     }
   }
 
@@ -277,12 +278,12 @@
     return (
       models.options.find((option) => option.value === pane.selectedModel)?.label ||
       pane.selectedModel ||
-      "Select model"
+      i18n.t("home.submitError.selectModel")
     );
   }
 
   function worktreeLabelFor(path: string): string {
-    if (!path.trim()) return "Select project";
+    if (!path.trim()) return i18n.t("home.submitError.selectProject");
 
     const selected = worktrees.worktrees.find((worktree) => worktree.path === path);
     const repo = worktrees.repoRoot
@@ -424,19 +425,19 @@
     const ulwCommand = parseUlwCommand(rawInput);
     const bangCommand = ulwCommand ? null : parseBangTerminalCommand(rawInput);
     if (ulwCommand?.kind === "stop") {
-      updatePane(paneId, { submitError: "Use /u stop inside an active window terminal." });
+      updatePane(paneId, { submitError: i18n.t("home.submitError.useStopInsideTerminal") });
       return;
     }
     if (ulwCommand?.kind === "config") {
-      updatePane(paneId, { submitError: "Start a window session first, then run /u config." });
+      updatePane(paneId, { submitError: i18n.t("home.submitError.startWindowFirstThenConfig") });
       return;
     }
     if (bangCommand && !bangCommand.command) {
-      updatePane(paneId, { submitError: "Usage: !<command> or !pwsh|cmd|bash|sh|zsh|fish <command>" });
+      updatePane(paneId, { submitError: i18n.t("home.submitError.bangUsage") });
       return;
     }
     if (pane.taskAttachments.length > 0 && (ulwCommand || bangCommand)) {
-      updatePane(paneId, { submitError: "Images can be sent with normal messages only." });
+      updatePane(paneId, { submitError: i18n.t("home.submitError.imagesNormalOnly") });
       return;
     }
 
@@ -468,7 +469,7 @@
           if (ulwCommand?.kind === "start") {
             updatePane(paneId, { task: "", taskAttachments: [] });
             if (!ulwCommand.task) {
-              updatePane(paneId, { submitError: "Add task after /u when launching from Home." });
+              updatePane(paneId, { submitError: i18n.t("home.submitError.addTaskAfterULaunchHome") });
               return;
             }
             const loopDeps = {
@@ -497,14 +498,14 @@
           }
         },
         onThreadStartFailed: (error) => {
-          updatePane(paneId, { submitError: error.message || "Failed to create task" });
+          updatePane(paneId, { submitError: error.message || i18n.t("home.submitError.failedToCreateTask") });
           clearPendingStart(paneId, token);
         },
       });
     } catch (err) {
       console.error("Failed to create task:", err);
       updatePane(paneId, {
-        submitError: err instanceof Error ? err.message : "Failed to create task",
+        submitError: err instanceof Error ? err.message : i18n.t("home.submitError.failedToCreateTask"),
       });
       clearPendingStart(paneId, token);
     }
@@ -536,14 +537,18 @@
 </script>
 
 <svelte:head>
-  <title>Codex Remote</title>
+  <title>{i18n.t("home.title")}</title>
 </svelte:head>
 
 <div class="home stack">
   <AppHeader status={socket.status}>
     {#snippet actions()}
-      <a href="/settings">Settings</a>
-      <button type="button" onclick={() => theme.cycle()} title="Theme: {theme.current}">
+      <a href="/settings">{i18n.t("home.settingsLink")}</a>
+      <button
+        type="button"
+        onclick={() => theme.cycle()}
+        title={i18n.t("common.themeTitle", { theme: i18n.themeName(theme.current) })}
+      >
         {themeIcons[theme.current]}
       </button>
     {/snippet}
@@ -560,19 +565,21 @@
     <div class="hero-content">
       <section class="workspace stack">
         <section class="workspace-masthead">
-          <span class="workspace-kicker">Homepage</span>
+          <span class="workspace-kicker">{i18n.t("home.homepage")}</span>
           <h1 class="workspace-title">
             <span class="workspace-title-main">CODEX</span>
-            <span class="workspace-title-sub"><span class="workspace-title-editorial">(remote)</span> control center</span>
+            <span class="workspace-title-sub">
+              <span class="workspace-title-editorial">{i18n.t("home.controlCenter")}</span>
+            </span>
           </h1>
           <p class="workspace-summary">
-            Run parallel coding windows, switch projects, and keep approvals in one place.
+            {i18n.t("home.summary")}
           </p>
         </section>
 
         <section class="pane-toolbar split">
           <div class="pane-count row">
-            <span class="count-label">Input windows</span>
+            <span class="count-label">{i18n.t("home.inputWindows")}</span>
             <div class="count-group row">
               {#each PANE_COUNT_OPTIONS as count}
                 <button
@@ -588,16 +595,16 @@
               {/each}
             </div>
           </div>
-          <span class="pane-hint">Each window has its own project, mode and model.</span>
+          <span class="pane-hint">{i18n.t("home.paneHint")}</span>
         </section>
 
         <section class="pane-grid">
           {#each visiblePanes as pane (pane.id)}
             <div class="pane stack">
               <div class="pane-title split">
-                <span>Window {pane.id}</span>
+                <span>{i18n.t("home.windowLabel", { id: pane.id })}</span>
                 {#if pane.isCreating}
-                  <span class="pane-status">Starting...</span>
+                  <span class="pane-status">{i18n.t("home.starting")}</span>
                 {/if}
               </div>
 
@@ -632,19 +639,19 @@
               {#if pane.threadId}
                 <section class="pane-terminal stack">
                   <div class="pane-terminal-header split">
-                    <span>Terminal • {pane.threadId.slice(0, 8)}</span>
+                    <span>{i18n.t("home.terminalHeader", { id: pane.threadId.slice(0, 8) })}</span>
                     <div class="pane-terminal-actions row">
                       {#if paneIsRunning(pane)}
                         <button type="button" class="terminal-stop" onclick={() => handleStopPane(pane.id)}>
-                          Stop
+                          {i18n.t("common.stop")}
                         </button>
                       {/if}
-                      <a href={"/thread/" + pane.threadId}>Open</a>
+                      <a href={"/thread/" + pane.threadId}>{i18n.t("common.open")}</a>
                     </div>
                   </div>
                   <div class="pane-terminal-body">
                     {#if paneMessages(pane).length === 0}
-                      <div class="pane-terminal-empty">Waiting for output...</div>
+                      <div class="pane-terminal-empty">{i18n.t("home.terminalEmpty")}</div>
                     {:else}
                       {#each paneMessages(pane) as message (message.id)}
                         {#if message.role === "approval" && message.approval}
@@ -708,18 +715,22 @@
                         target.value = "";
                       }}
                     />
-                    <label class="terminal-attach" for={"terminal-images-" + pane.id} title="Attach images">
-                      Img
+                    <label
+                      class="terminal-attach"
+                      for={"terminal-images-" + pane.id}
+                      title={i18n.t("home.terminalAttachTitle")}
+                    >
+                      {i18n.t("common.img")}
                     </label>
                     <input
                       type="text"
-                      placeholder="Type message, attach image, !command, or /u command for this window"
+                      placeholder={i18n.t("home.terminalPlaceholder")}
                       value={pane.terminalInput}
                       oninput={(e) => handleTerminalInputChange(pane.id, (e.currentTarget as HTMLInputElement).value)}
                       disabled={!pane.threadId || !isConnected || paneIsRunning(pane)}
                     />
                     <button type="submit" disabled={!canSendTerminalInput(pane)}>
-                      Send
+                      {i18n.t("common.send")}
                     </button>
                   </form>
                   {#if pane.terminalAttachments.length > 0}
@@ -732,7 +743,7 @@
                         </div>
                       {/each}
                       <button type="button" class="terminal-attachment-clear" onclick={() => clearTerminalImages(pane.id)}>
-                        Clear
+                        {i18n.t("common.clear")}
                       </button>
                     </div>
                   {/if}

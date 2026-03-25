@@ -3,6 +3,7 @@ import type {
   PublicKeyCredentialCreationOptionsJSON,
   PublicKeyCredentialRequestOptionsJSON,
 } from "@simplewebauthn/types";
+import { i18n, type TranslationParams } from "./i18n.svelte";
 
 const STORE_KEY = "__codex_remote_auth_store__";
 const STORAGE_KEY = "codex_remote_auth_token";
@@ -92,6 +93,10 @@ interface TotpSetupState {
   username: string;
 }
 
+type StoreMessage =
+  | { kind: "key"; key: string; params?: TranslationParams }
+  | { kind: "text"; text: string };
+
 function apiUrl(path: string): string {
   return `${AUTH_BASE_URL}${path}`;
 }
@@ -131,10 +136,16 @@ class AuthStore {
   token = $state<string | null>(null);
   user = $state<AuthUser | null>(null);
   busy = $state(false);
-  error = $state<string | null>(null);
+  error = $state<StoreMessage | null>(null);
   #refreshToken: string | null = null;
   #refreshTimer: ReturnType<typeof setTimeout> | null = null;
   #refreshPromise: Promise<boolean> | null = null;
+
+  get errorText(): string | null {
+    if (!this.error) return null;
+    if (this.error.kind === "text") return this.error.text;
+    return i18n.t(this.error.key, this.error.params);
+  }
 
   constructor() {
     this.#loadToken();
@@ -143,7 +154,7 @@ class AuthStore {
 
   async initialize() {
     this.status = "loading";
-    this.error = null;
+    this.#clearError();
     this.totpSetup = null;
 
     // Local mode: skip all auth for trusted networks (e.g., Tailscale)
@@ -162,7 +173,7 @@ class AuthStore {
       const data = await parseResponse<AuthSessionResponse>(response);
 
       if (!response.ok || !data) {
-        this.error = "Auth backend unavailable.";
+        this.#setErrorKey("auth.error.backendUnavailable");
         this.status = "signed_out";
         return;
       }
@@ -204,7 +215,7 @@ class AuthStore {
       this.#clearToken();
       this.status = data.systemHasUsers ? "signed_out" : "needs_setup";
     } catch {
-      this.error = "Auth backend unavailable.";
+      this.#setErrorKey("auth.error.backendUnavailable");
       this.status = "signed_out";
     }
   }
@@ -212,7 +223,7 @@ class AuthStore {
   async signIn(username: string, method: AuthMethod = "passkey", totpCode = ""): Promise<void> {
     if (this.busy) return;
     this.busy = true;
-    this.error = null;
+    this.#clearError();
 
     try {
       if (AUTH_MODE === "basic") {
@@ -223,7 +234,11 @@ class AuthStore {
         });
         const data = await parseResponse<BasicAuthResponse>(response);
         if (!response.ok || !data?.token) {
-          this.error = data?.error ?? "Sign-in failed.";
+          if (data?.error) {
+            this.#setErrorText(data.error);
+          } else {
+            this.#setErrorKey("auth.error.signInFailed");
+          }
           return;
         }
 
@@ -240,7 +255,11 @@ class AuthStore {
         });
         const data = await parseResponse<BasicAuthResponse>(response);
         if (!response.ok || !data?.token) {
-          this.error = data?.error ?? "Sign-in failed.";
+          if (data?.error) {
+            this.#setErrorText(data.error);
+          } else {
+            this.#setErrorKey("auth.error.signInFailed");
+          }
           return;
         }
         this.#applySession({ verified: true, token: data.token, refreshToken: data.refreshToken, user: data.user });
@@ -255,7 +274,11 @@ class AuthStore {
       });
       const options = await parseResponse<LoginOptionsResponse>(optionsResponse);
       if (!optionsResponse.ok || !options || options.error) {
-        this.error = options?.error ?? "Unable to request sign-in.";
+        if (options?.error) {
+          this.#setErrorText(options.error);
+        } else {
+          this.#setErrorKey("auth.error.unableToRequestSignIn");
+        }
         return;
       }
 
@@ -267,14 +290,22 @@ class AuthStore {
       });
       const verify = await parseResponse<AuthVerifyResponse & { error?: string }>(verifyResponse);
       if (!verifyResponse.ok || !verify?.token) {
-        this.error = verify?.error ?? "Sign-in failed.";
+        if (verify?.error) {
+          this.#setErrorText(verify.error);
+        } else {
+          this.#setErrorKey("auth.error.signInFailed");
+        }
         return;
       }
 
       this.#applySession(verify);
       this.hasPasskey = true;
     } catch (err) {
-      this.error = err instanceof Error ? err.message : "Sign-in cancelled.";
+      if (err instanceof Error) {
+        this.#setErrorText(err.message);
+      } else {
+        this.#setErrorKey("auth.error.signInCancelled");
+      }
     } finally {
       this.busy = false;
     }
@@ -283,7 +314,7 @@ class AuthStore {
   async register(name: string, displayName?: string): Promise<void> {
     if (this.busy) return;
     this.busy = true;
-    this.error = null;
+    this.#clearError();
 
     try {
       if (AUTH_MODE === "basic") {
@@ -294,7 +325,11 @@ class AuthStore {
         });
         const data = await parseResponse<BasicAuthResponse>(response);
         if (!response.ok || !data?.token) {
-          this.error = data?.error ?? "Registration failed.";
+          if (data?.error) {
+            this.#setErrorText(data.error);
+          } else {
+            this.#setErrorKey("auth.error.registrationFailed");
+          }
           return;
         }
 
@@ -310,7 +345,11 @@ class AuthStore {
       });
       const options = await parseResponse<RegisterOptionsResponse>(optionsResponse);
       if (!optionsResponse.ok || !options || options.error) {
-        this.error = options?.error ?? "Unable to start registration.";
+        if (options?.error) {
+          this.#setErrorText(options.error);
+        } else {
+          this.#setErrorKey("auth.error.unableToStartRegistration");
+        }
         return;
       }
 
@@ -322,14 +361,22 @@ class AuthStore {
       });
       const verify = await parseResponse<AuthVerifyResponse & { error?: string }>(verifyResponse);
       if (!verifyResponse.ok || !verify?.token) {
-        this.error = verify?.error ?? "Registration failed.";
+        if (verify?.error) {
+          this.#setErrorText(verify.error);
+        } else {
+          this.#setErrorKey("auth.error.registrationFailed");
+        }
         return;
       }
 
       this.#applySession(verify);
       this.hasPasskey = true;
     } catch (err) {
-      this.error = err instanceof Error ? err.message : "Registration cancelled.";
+      if (err instanceof Error) {
+        this.#setErrorText(err.message);
+      } else {
+        this.#setErrorKey("auth.error.registrationCancelled");
+      }
     } finally {
       this.busy = false;
     }
@@ -338,7 +385,7 @@ class AuthStore {
   async startTotpRegistration(name: string, displayName?: string): Promise<boolean> {
     if (this.busy) return false;
     this.busy = true;
-    this.error = null;
+    this.#clearError();
 
     try {
       const response = await fetch(apiUrl("/auth/register/totp/start"), {
@@ -348,7 +395,11 @@ class AuthStore {
       });
       const data = await parseResponse<TotpSetupResponse>(response);
       if (!response.ok || !data?.setupToken || !data.secret || !data.otpauthUrl) {
-        this.error = data?.error ?? "Unable to start TOTP setup.";
+        if (data?.error) {
+          this.#setErrorText(data.error);
+        } else {
+          this.#setErrorKey("auth.error.unableToStartTotpSetup");
+        }
         this.totpSetup = null;
         return false;
       }
@@ -357,14 +408,18 @@ class AuthStore {
         setupToken: data.setupToken,
         secret: data.secret,
         otpauthUrl: data.otpauthUrl,
-        issuer: data.issuer ?? "Codex Remote",
+        issuer: data.issuer ?? i18n.t("landing.title"),
         digits: data.digits ?? 6,
         period: data.period ?? 30,
         username: name,
       };
       return true;
     } catch (err) {
-      this.error = err instanceof Error ? err.message : "Unable to start TOTP setup.";
+      if (err instanceof Error) {
+        this.#setErrorText(err.message);
+      } else {
+        this.#setErrorKey("auth.error.unableToStartTotpSetup");
+      }
       this.totpSetup = null;
       return false;
     } finally {
@@ -375,12 +430,12 @@ class AuthStore {
   async completeTotpRegistration(code: string): Promise<void> {
     if (this.busy) return;
     if (!this.totpSetup) {
-      this.error = "TOTP setup is missing.";
+      this.#setErrorKey("auth.error.totpSetupMissing");
       return;
     }
 
     this.busy = true;
-    this.error = null;
+    this.#clearError();
     try {
       const response = await fetch(apiUrl("/auth/register/totp/verify"), {
         method: "POST",
@@ -389,7 +444,11 @@ class AuthStore {
       });
       const data = await parseResponse<BasicAuthResponse>(response);
       if (!response.ok || !data?.token) {
-        this.error = data?.error ?? "Registration failed.";
+        if (data?.error) {
+          this.#setErrorText(data.error);
+        } else {
+          this.#setErrorKey("auth.error.registrationFailed");
+        }
         return;
       }
 
@@ -397,7 +456,11 @@ class AuthStore {
       this.hasTotp = true;
       this.totpSetup = null;
     } catch (err) {
-      this.error = err instanceof Error ? err.message : "Registration failed.";
+      if (err instanceof Error) {
+        this.#setErrorText(err.message);
+      } else {
+        this.#setErrorKey("auth.error.registrationFailed");
+      }
     } finally {
       this.busy = false;
     }
@@ -424,8 +487,20 @@ class AuthStore {
     this.hasTotp = false;
     this.totpSetup = null;
     this.status = "signed_out";
-    this.error = null;
+    this.#clearError();
     this.#clearToken();
+  }
+
+  #setErrorKey(key: string, params?: TranslationParams) {
+    this.error = { kind: "key", key, ...(params ? { params } : {}) };
+  }
+
+  #setErrorText(text: string) {
+    this.error = { kind: "text", text };
+  }
+
+  #clearError() {
+    this.error = null;
   }
 
   /** Enable local mode for trusted networks (bypasses all auth) */

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { auth } from "../lib/auth.svelte";
+  import { i18n } from "../lib/i18n.svelte";
   import { navigate } from "../router";
   import AuthPageLayout from "../lib/components/AuthPageLayout.svelte";
 
@@ -25,19 +26,19 @@
 </script>
 
 <svelte:head>
-  <title>Sign in — Codex Remote</title>
+  <title>{i18n.t("auth.login.title")}</title>
 </svelte:head>
 
 <AuthPageLayout>
-  <span class="eyebrow">Sign in</span>
-  <h1>Sign in</h1>
+  <span class="eyebrow">{i18n.t("auth.login.eyebrow")}</span>
+  <h1>{i18n.t("auth.login.heading")}</h1>
   <p class="subtitle">
     {#if authMode === "basic"}
-      Sign in with your username.
+      {i18n.t("auth.login.subtitle.basic")}
     {:else if method === "totp"}
-      Sign in with your username and one-time code.
+      {i18n.t("auth.login.subtitle.totp")}
     {:else}
-      Use your passkey to access Codex Remote.
+      {i18n.t("auth.login.subtitle.passkey")}
     {/if}
   </p>
 
@@ -51,7 +52,7 @@
           totpCode = "";
         }}
       >
-        Passkey
+        {i18n.t("auth.login.method.passkey")}
       </button>
       <button
         type="button"
@@ -60,19 +61,19 @@
           method = "totp";
         }}
       >
-        TOTP
+        {i18n.t("auth.login.method.totp")}
       </button>
     </div>
   {/if}
 
-  {#if auth.error}
-    <div class="auth-error">{auth.error}</div>
+  {#if auth.errorText}
+    <div class="auth-error">{auth.errorText}</div>
   {/if}
 
   <input
     type="text"
     class="auth-input"
-    placeholder="Username"
+    placeholder={i18n.t("auth.login.usernamePlaceholder")}
     autocomplete="username"
     autocapitalize="none"
     autocorrect="off"
@@ -106,16 +107,16 @@
     disabled={auth.busy || !username.trim() || (method === "totp" && !totpCode.trim())}
   >
     {#if auth.busy}
-      Working...
+      {i18n.t("common.working")}
     {:else if authMode === "basic"}
-      Sign in
+      {i18n.t("common.signIn")}
     {:else if method === "totp"}
-      Sign in with TOTP
+      {i18n.t("auth.login.submit.totp")}
     {:else}
-      Sign in with passkey
+      {i18n.t("auth.login.submit.passkey")}
     {/if}
   </button>
-  <a class="link-btn" href="/register">Create new account</a>
+  <a class="link-btn" href="/register">{i18n.t("auth.login.createAccount")}</a>
 </AuthPageLayout>
 
 <style>

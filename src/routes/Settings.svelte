@@ -1,6 +1,7 @@
 <script lang="ts">
   import { auth } from "../lib/auth.svelte";
   import { theme } from "../lib/theme.svelte";
+  import { i18n, type Locale, type TranslationParams } from "../lib/i18n.svelte";
   import { config } from "../lib/config.svelte";
   import { connectionManager } from "../lib/connection-manager.svelte";
   import { socket } from "../lib/socket.svelte";
@@ -32,11 +33,15 @@
   const canManageCodexConfig = $derived(auth.isLocalMode || Boolean(selectedAnchorId));
   const canManageRelease = $derived(auth.isLocalMode || Boolean(selectedAnchorId));
   const connectionActionLabel = $derived.by(() => {
-    if (socket.status === "connecting") return "Cancel";
-    if (socket.status === "reconnecting") return "Stop reconnect";
-    if (socket.status === "connected") return "Disconnect";
-    return "Connect";
+    if (socket.status === "connecting") return i18n.t("common.cancel");
+    if (socket.status === "reconnecting") return i18n.t("common.stopReconnect");
+    if (socket.status === "connected") return i18n.t("common.disconnect");
+    return i18n.t("common.connect");
   });
+
+  type UiMessage =
+    | { kind: "key"; key: string; params?: TranslationParams }
+    | { kind: "text"; text: string };
 
   let codexConfigPath = $state("");
   let codexConfigCandidates = $state<string[]>([]);
@@ -46,13 +51,31 @@
   let codexConfigLoading = $state(false);
   let codexConfigSaving = $state(false);
   let codexConfigDirty = $state(false);
-  let codexConfigError = $state<string | null>(null);
-  let codexConfigInfo = $state<string | null>(null);
+  let codexConfigError = $state<UiMessage | null>(null);
+  let codexConfigInfo = $state<UiMessage | null>(null);
   let codexConfigLoadedFor = $state<string | null>(null);
+
+  function toMessageText(message: UiMessage | null): string {
+    if (!message) return "";
+    if (message.kind === "text") return message.text;
+    return i18n.t(message.key, message.params);
+  }
+
+  function setCodexConfigErrorKey(key: string, params?: TranslationParams) {
+    codexConfigError = { kind: "key", key, ...(params ? { params } : {}) };
+  }
+
+  function setCodexConfigErrorText(text: string) {
+    codexConfigError = { kind: "text", text };
+  }
+
+  function setCodexConfigInfoKey(key: string, params?: TranslationParams) {
+    codexConfigInfo = { kind: "key", key, ...(params ? { params } : {}) };
+  }
 
   function formatSince(iso: string): string {
     const date = new Date(iso);
-    return date.toLocaleString(undefined, {
+    return i18n.formatDate(date, {
       month: "short",
       day: "numeric",
       hour: "2-digit",
@@ -84,15 +107,15 @@
 
   async function loadCodexConfig(path?: string, force = false) {
     if (!isSocketConnected) {
-      codexConfigError = "Connect first to load config.toml.";
+      setCodexConfigErrorKey("settings.hint.connectFirstLoadConfig");
       return;
     }
     if (!canManageCodexConfig) {
-      codexConfigError = "Select a device to load config.toml.";
+      setCodexConfigErrorKey("settings.hint.selectDeviceLoadConfig");
       return;
     }
     if (codexConfigDirty && !force && !path) {
-      codexConfigInfo = "Unsaved changes detected. Save or reload to discard.";
+      setCodexConfigInfoKey("settings.hint.unsavedChangesDetected");
       return;
     }
 
@@ -108,11 +131,17 @@
       codexConfigContent = result.content;
       codexConfigDirty = false;
       codexConfigLoadedFor = resolveConfigTargetKey();
-      codexConfigInfo = result.exists
-        ? `Loaded ${result.path}`
-        : `config.toml not found. It will be created at ${result.path} when you save.`;
+      if (result.exists) {
+        setCodexConfigInfoKey("settings.hint.loadedPath", { path: result.path });
+      } else {
+        setCodexConfigInfoKey("settings.hint.configWillCreateAtPath", { path: result.path });
+      }
     } catch (err) {
-      codexConfigError = err instanceof Error ? err.message : "Failed to load config.toml";
+      if (err instanceof Error) {
+        setCodexConfigErrorText(err.message);
+      } else {
+        setCodexConfigErrorKey("settings.hint.failedLoadConfig");
+      }
     } finally {
       codexConfigLoading = false;
     }
@@ -120,15 +149,15 @@
 
   async function saveCodexConfig() {
     if (!isSocketConnected) {
-      codexConfigError = "Connect first to save config.toml.";
+      setCodexConfigErrorKey("settings.hint.connectFirstSaveConfig");
       return;
     }
     if (!canManageCodexConfig) {
-      codexConfigError = "Select a device to save config.toml.";
+      setCodexConfigErrorKey("settings.hint.selectDeviceSaveConfig");
       return;
     }
     if (!codexConfigPath.trim()) {
-      codexConfigError = "config.toml path is empty.";
+      setCodexConfigErrorKey("settings.hint.configPathEmpty");
       return;
     }
 
@@ -144,9 +173,13 @@
       codexConfigExists = true;
       codexConfigDirty = false;
       codexConfigLoadedFor = resolveConfigTargetKey();
-      codexConfigInfo = `Saved ${result.path}`;
+      setCodexConfigInfoKey("settings.hint.savedPath", { path: result.path });
     } catch (err) {
-      codexConfigError = err instanceof Error ? err.message : "Failed to save config.toml";
+      if (err instanceof Error) {
+        setCodexConfigErrorText(err.message);
+      } else {
+        setCodexConfigErrorKey("settings.hint.failedSaveConfig");
+      }
     } finally {
       codexConfigSaving = false;
     }
@@ -202,10 +235,18 @@
 
 </script>
 
+<svelte:head>
+  <title>{i18n.t("settings.title")}</title>
+</svelte:head>
+
 <div class="settings stack">
   <AppHeader status={socket.status}>
     {#snippet actions()}
-      <button type="button" onclick={() => theme.cycle()} title="Theme: {theme.current}">
+      <button
+        type="button"
+        onclick={() => theme.cycle()}
+        title={i18n.t("common.themeTitle", { theme: i18n.themeName(theme.current) })}
+      >
         {themeIcons[theme.current]}
       </button>
     {/snippet}
@@ -213,19 +254,19 @@
 
   <div class="content stack">
     <section class="settings-masthead stack">
-      <span class="settings-kicker">Control plane</span>
-      <h1>SETTINGS</h1>
-      <p>Manage connection, devices, notifications, and account-level actions.</p>
+      <span class="settings-kicker">{i18n.t("settings.kicker")}</span>
+      <h1>{i18n.t("settings.heading")}</h1>
+      <p>{i18n.t("settings.summary")}</p>
     </section>
 
     <div class="section stack">
       <div class="section-header">
         <span class="section-index">01</span>
-        <span class="section-title">Connection</span>
+        <span class="section-title">{i18n.t("settings.section.connection")}</span>
       </div>
       <div class="section-body stack">
         <div class="field stack">
-          <label for="orbit-url">{auth.isLocalMode ? "Anchor URL" : "Orbit URL"}</label>
+          <label for="orbit-url">{auth.isLocalMode ? i18n.t("settings.label.anchorUrl") : i18n.t("settings.label.orbitUrl")}</label>
           <input
             id="orbit-url"
             type="text"
@@ -255,12 +296,12 @@
         {/if}
         <p class="hint">
           {socket.status === "disconnected"
-            ? "Auto-connect paused. Click Connect to resume."
-            : "Connection is automatic on app load. Disconnect to pause and to change the URL."}
+            ? i18n.t("settings.hint.autoConnectPaused")
+            : i18n.t("settings.hint.autoConnectActive")}
         </p>
         {#if auth.isLocalMode}
           <p class="hint hint-local">
-            Local mode: Connect directly to Anchor on your network (e.g., via Tailscale). No Orbit authentication required.
+            {i18n.t("settings.hint.localMode")}
           </p>
         {/if}
       </div>
@@ -269,16 +310,16 @@
     <div class="section stack">
       <div class="section-header">
         <span class="section-index">02</span>
-        <span class="section-title">Devices</span>
+        <span class="section-title">{i18n.t("settings.section.devices")}</span>
       </div>
       <div class="section-body stack">
         {#if !isSocketConnected}
           <p class="hint">
-            Connect to load devices.
+            {i18n.t("settings.hint.connectToLoadDevices")}
           </p>
         {:else if anchorList.length === 0}
           <p class="hint">
-            No devices connected. Run <code>codex-remote start</code> in your terminal — a code will appear, then enter it at <a href="/device">/device</a> to authorise.
+            {i18n.t("settings.hint.noDevices")}
           </p>
         {:else}
           <ul class="anchor-list">
@@ -291,20 +332,25 @@
                   onclick={() => handleSelectAnchor(anchor.id)}
                   aria-pressed={selectedAnchorId === anchor.id}
                 >
-                  <span class="anchor-status" title="Connected">●</span>
+                  <span class="anchor-status" title={i18n.t("settings.hint.deviceConnectedTitle")}>●</span>
                 </button>
                 <div class="anchor-info">
                   <span class="anchor-hostname">{anchor.hostname}</span>
-                  <span class="anchor-meta">{platformLabels[anchor.platform] ?? anchor.platform} · since {formatSince(anchor.connectedAt)}</span>
+                  <span class="anchor-meta">
+                    {i18n.t("settings.hint.deviceMeta", {
+                      platform: platformLabels[anchor.platform] ?? anchor.platform,
+                      since: formatSince(anchor.connectedAt),
+                    })}
+                  </span>
                 </div>
                 {#if selectedAnchorId === anchor.id}
-                  <span class="anchor-selected-label">Selected</span>
+                  <span class="anchor-selected-label">{i18n.t("settings.hint.selected")}</span>
                 {/if}
               </li>
             {/each}
           </ul>
           {#if !selectedAnchorId}
-            <p class="hint hint-error">Select a device. New sessions will start only on the selected device.</p>
+            <p class="hint hint-error">{i18n.t("settings.hint.selectDeviceForSessions")}</p>
           {/if}
         {/if}
       </div>
@@ -313,16 +359,16 @@
     <div class="section stack">
       <div class="section-header">
         <span class="section-index">03</span>
-        <span class="section-title">Codex Config</span>
+        <span class="section-title">{i18n.t("settings.section.codexConfig")}</span>
       </div>
       <div class="section-body stack">
         {#if !isSocketConnected}
-          <p class="hint">Connect first to read and edit <code>config.toml</code>.</p>
+          <p class="hint">{i18n.t("settings.hint.connectFirstReadEditConfig")}</p>
         {:else if !canManageCodexConfig}
-          <p class="hint">Select a device to edit <code>config.toml</code> on that machine.</p>
+          <p class="hint">{i18n.t("settings.hint.selectDeviceEditConfig")}</p>
         {:else}
           <div class="field stack">
-            <label for="codex-config-path">config.toml path</label>
+            <label for="codex-config-path">{i18n.t("settings.label.configPath")}</label>
             {#if codexConfigCandidates.length > 1}
               <select
                 id="codex-config-path"
@@ -346,16 +392,16 @@
           </div>
 
           {#if codexConfigPlatform}
-            <p class="hint">Detected OS: {codexConfigPlatform}</p>
+            <p class="hint">{i18n.t("settings.hint.detectedOs", { os: codexConfigPlatform })}</p>
           {/if}
           <p class="hint">
             {codexConfigExists
-              ? "Editing existing file."
-              : "File does not exist yet; Save will create it."}
+              ? i18n.t("settings.hint.editingExisting")
+              : i18n.t("settings.hint.fileNotExistYet")}
           </p>
 
           <div class="field stack">
-            <label for="codex-config-content">Contents</label>
+            <label for="codex-config-content">{i18n.t("settings.label.configContents")}</label>
             <textarea
               id="codex-config-content"
               class="config-editor"
@@ -374,7 +420,7 @@
               onclick={() => loadCodexConfig(undefined, true)}
               disabled={codexConfigLoading || codexConfigSaving}
             >
-              {codexConfigLoading ? "Loading..." : "Reload"}
+              {codexConfigLoading ? i18n.t("common.loading") : i18n.t("common.reload")}
             </button>
             <button
               class="action-btn"
@@ -382,25 +428,47 @@
               onclick={saveCodexConfig}
               disabled={codexConfigLoading || codexConfigSaving || !codexConfigPath || !codexConfigDirty}
             >
-              {codexConfigSaving ? "Saving..." : "Save"}
+              {codexConfigSaving ? i18n.t("common.working") : i18n.t("common.save")}
             </button>
           </div>
           {#if codexConfigDirty}
-            <p class="hint">Unsaved changes.</p>
+            <p class="hint">{i18n.t("settings.hint.unsavedChanges")}</p>
           {/if}
           {#if codexConfigInfo}
-            <p class="hint hint-local">{codexConfigInfo}</p>
+            <p class="hint hint-local">{toMessageText(codexConfigInfo)}</p>
           {/if}
           {#if codexConfigError}
-            <p class="hint hint-error">{codexConfigError}</p>
+            <p class="hint hint-error">{toMessageText(codexConfigError)}</p>
           {/if}
         {/if}
       </div>
     </div>
 
-    <NotificationSettings />
+    <div class="section stack">
+      <div class="section-header">
+        <span class="section-index">04</span>
+        <span class="section-title">{i18n.t("settings.section.language")}</span>
+      </div>
+      <div class="section-body stack">
+        <div class="field stack">
+          <label for="ui-language">{i18n.t("common.language")}</label>
+          <select
+            id="ui-language"
+            value={i18n.current}
+            onchange={(e) => i18n.set((e.currentTarget as HTMLSelectElement).value as Locale)}
+          >
+            <option value="en">{i18n.t("common.english")}</option>
+            <option value="zh-CN">{i18n.t("common.chineseSimplified")}</option>
+          </select>
+        </div>
+        <p class="hint">{i18n.t("settings.language.help")}</p>
+      </div>
+    </div>
+
+    <NotificationSettings sectionIndex="05" />
 
     <ReleaseCockpit
+      sectionIndex="06"
       connected={isSocketConnected}
       canManage={canManageRelease}
       inspect={releaseCockpit.inspect}
@@ -421,11 +489,13 @@
     {#if !auth.isLocalMode}
       <div class="section stack">
         <div class="section-header">
-          <span class="section-index">06</span>
-          <span class="section-title">Account</span>
+          <span class="section-index">07</span>
+          <span class="section-title">{i18n.t("settings.section.account")}</span>
         </div>
         <div class="section-body stack">
-          <button class="action-btn danger" type="button" onclick={() => auth.signOut()}>Sign out</button>
+          <button class="action-btn danger" type="button" onclick={() => auth.signOut()}>
+            {i18n.t("settings.button.signOut")}
+          </button>
         </div>
       </div>
     {/if}

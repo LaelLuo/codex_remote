@@ -1,7 +1,9 @@
 <script lang="ts">
+  import { i18n } from "../i18n.svelte";
   import type { ReleaseInspectResult, ReleaseStartParams, ReleaseStatusResult } from "../types";
 
   type Props = {
+    sectionIndex?: string;
     connected: boolean;
     canManage: boolean;
     inspect: ReleaseInspectResult | null;
@@ -20,6 +22,7 @@
   };
 
   const {
+    sectionIndex = "05",
     connected,
     canManage,
     inspect,
@@ -60,7 +63,7 @@
   function formatTs(value: string): string {
     const date = new Date(value);
     if (!Number.isFinite(date.getTime())) return value;
-    return date.toLocaleString(undefined, {
+    return i18n.formatDate(date, {
       month: "short",
       day: "numeric",
       hour: "2-digit",
@@ -89,60 +92,64 @@
 
 <div class="section stack">
   <div class="section-header">
-    <span class="section-index">05</span>
-    <span class="section-title">Release Cockpit</span>
+    <span class="section-index">{sectionIndex}</span>
+    <span class="section-title">{i18n.t("release.sectionTitle")}</span>
   </div>
   <div class="section-body stack">
     {#if !connected}
-      <p class="hint">Connect first to inspect and run releases.</p>
+      <p class="hint">{i18n.t("release.hint.connectFirst")}</p>
     {:else if !canManage}
-      <p class="hint">Select a device to run release checks on that machine.</p>
+      <p class="hint">{i18n.t("release.hint.selectDevice")}</p>
     {:else}
       <div class="field-grid">
         <div class="field stack">
-          <label for="release-repo">Repo path</label>
+          <label for="release-repo">{i18n.t("release.label.repoPath")}</label>
           <input id="release-repo" type="text" bind:value={repoPath} placeholder="D:\\REALPROJECTS\\zane" />
         </div>
         <div class="field stack">
-          <label for="release-ref">Target ref</label>
+          <label for="release-ref">{i18n.t("release.label.targetRef")}</label>
           <input id="release-ref" type="text" bind:value={targetRef} placeholder="main" />
         </div>
         <div class="field stack">
-          <label for="release-tag">Tag (optional)</label>
+          <label for="release-tag">{i18n.t("release.label.tagOptional")}</label>
           <input id="release-tag" type="text" bind:value={tag} placeholder="v1.2.3" />
         </div>
       </div>
 
       <label class="toggle row">
         <input type="checkbox" bind:checked={dryRun} />
-        <span>Dry run</span>
+        <span>{i18n.t("release.label.dryRun")}</span>
       </label>
 
       <div class="connect-actions row">
         <button class="action-btn" type="button" onclick={handleInspect} disabled={inspectLoading || startLoading}>
-          {inspectLoading ? "Inspecting..." : "Inspect readiness"}
+          {inspectLoading ? i18n.t("release.button.inspecting") : i18n.t("release.button.inspectReadiness")}
         </button>
         <button class="action-btn" type="button" onclick={handleStart} disabled={startLoading || inspectLoading}>
-          {startLoading ? "Starting..." : "Start release"}
+          {startLoading ? i18n.t("release.button.starting") : i18n.t("release.button.startRelease")}
         </button>
         <button class="action-btn" type="button" onclick={onPoll} disabled={!status?.releaseId || statusLoading}>
-          {statusLoading ? "Polling..." : "Poll status"}
+          {statusLoading ? i18n.t("release.button.polling") : i18n.t("release.button.pollStatus")}
         </button>
         {#if polling}
-          <button class="action-btn" type="button" onclick={onStopPolling}>Stop auto-poll</button>
+          <button class="action-btn" type="button" onclick={onStopPolling}>{i18n.t("release.button.stopAutoPoll")}</button>
         {:else}
-          <button class="action-btn" type="button" onclick={onStartPolling} disabled={!status?.releaseId}>Auto-poll</button>
+          <button class="action-btn" type="button" onclick={onStartPolling} disabled={!status?.releaseId}>
+            {i18n.t("release.button.autoPoll")}
+          </button>
         {/if}
       </div>
 
       {#if inspect}
         <div class="status-card stack">
           <div class="row readiness-row">
-            <span class="status-label">Readiness</span>
-            <span class="badge {inspect.ready ? 'ok' : 'warn'}">{inspect.ready ? "Ready" : "Needs fixes"}</span>
+            <span class="status-label">{i18n.t("release.readiness")}</span>
+            <span class="badge {inspect.ready ? 'ok' : 'warn'}">
+              {inspect.ready ? i18n.t("release.ready") : i18n.t("release.needsFixes")}
+            </span>
           </div>
           {#if inspect.branch}
-            <p class="hint">Branch: <code>{inspect.branch}</code></p>
+            <p class="hint">{i18n.t("release.branch", { branch: inspect.branch })}</p>
           {/if}
           {#if inspect.checks.length > 0}
             <ul class="check-list">
@@ -170,7 +177,7 @@
       {#if status}
         <div class="status-card stack">
           <div class="row readiness-row">
-            <span class="status-label">Release {status.releaseId}</span>
+            <span class="status-label">{i18n.t("release.statusLabel", { releaseId: status.releaseId })}</span>
             <span class="badge {statusTone(status.status)}">{status.status}</span>
             {#if status.phase}
               <span class="badge neutral">{status.phase}</span>
@@ -191,13 +198,13 @@
 
           {#if status.assets.length > 0}
             <div class="asset-wrap stack">
-              <span class="status-label">Assets</span>
+              <span class="status-label">{i18n.t("release.assets")}</span>
               <ul class="asset-list">
                 {#each status.assets as asset (asset.id)}
                   <li>
                     <span>{asset.label}</span>
                     {#if asset.href}
-                      <a href={asset.href} target="_blank" rel="noreferrer">Open</a>
+                      <a href={asset.href} target="_blank" rel="noreferrer">{i18n.t("common.open")}</a>
                     {:else if asset.path}
                       <code>{asset.path}</code>
                     {/if}
@@ -209,13 +216,13 @@
 
           {#if status.links.length > 0}
             <div class="asset-wrap stack">
-              <span class="status-label">Links</span>
+              <span class="status-label">{i18n.t("release.links")}</span>
               <ul class="asset-list">
                 {#each status.links as link (link.id)}
                   <li>
                     <span>{link.label}</span>
                     {#if link.href}
-                      <a href={link.href} target="_blank" rel="noreferrer">Open</a>
+                      <a href={link.href} target="_blank" rel="noreferrer">{i18n.t("common.open")}</a>
                     {/if}
                   </li>
                 {/each}

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
+  import { i18n } from "../i18n.svelte";
   import { extractClipboardImageFiles, readTurnImages } from "../input-images";
   import type { ModeKind, ModelOption, TurnImageInput } from "../types";
 
@@ -95,7 +96,7 @@
     }}
     onkeydown={handleTaskKeydown}
     onpaste={handlePaste}
-    placeholder="Fix a bug, build a feature, refactor code... (or attach/paste image, !<command>, /u <task>)"
+    placeholder={i18n.t("composer.placeholder")}
     rows="3"
     disabled={isCreating}
   ></textarea>
@@ -128,7 +129,9 @@
           </button>
         </div>
       {/each}
-      <button type="button" class="attachment-clear" onclick={() => dispatch("taskImagesCleared")}>Clear</button>
+      <button type="button" class="attachment-clear" onclick={() => dispatch("taskImagesCleared")}>
+        {i18n.t("common.clear")}
+      </button>
     </div>
   {/if}
 
@@ -152,7 +155,7 @@
             <path d="M12 2a4 4 0 0 0-4 4v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2h-2V6a4 4 0 0 0-4-4Z" />
             <circle cx="12" cy="14" r="2" />
           </svg>
-          <span class="tool-key">Model</span>
+          <span class="tool-key">{i18n.t("common.model")}</span>
           <span class="tool-value collapsible-label">{currentModelLabel}</span>
           <svg class="chevron collapsible-label" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="m6 9 6 6 6-6" />
@@ -161,11 +164,11 @@
         {#if modelOpen}
           <div class="dropdown-menu">
             {#if modelsStatus === "loading" || modelsStatus === "idle"}
-              <div class="dropdown-empty">Loading models...</div>
+              <div class="dropdown-empty">{i18n.t("composer.modelLoading")}</div>
             {:else if modelsStatus === "error"}
-              <div class="dropdown-empty">Failed to load models</div>
+              <div class="dropdown-empty">{i18n.t("composer.modelLoadFailed")}</div>
             {:else if modelOptions.length === 0}
-              <div class="dropdown-empty">No models available</div>
+              <div class="dropdown-empty">{i18n.t("composer.modelUnavailable")}</div>
             {:else}
               {#each modelOptions as option}
                 <button
@@ -202,13 +205,13 @@
             <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
             <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
           </svg>
-          <span>Plan</span>
+          <span>{i18n.t("common.plan")}</span>
         {:else}
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="16 18 22 12 16 6" />
             <polyline points="8 6 2 12 8 18" />
           </svg>
-          <span>Code</span>
+          <span>{i18n.t("common.code")}</span>
         {/if}
       </button>
 
@@ -218,7 +221,7 @@
         onclick={openImagePicker}
         disabled={isCreating}
       >
-        <span>Img</span>
+        <span>{i18n.t("common.img")}</span>
       </button>
     </div>
 
@@ -241,7 +244,7 @@
   <svg class="chip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
   </svg>
-  <span class="tool-key">Project</span>
+  <span class="tool-key">{i18n.t("common.project")}</span>
   <span class="tool-value">{worktreeDisplay}</span>
 </button>
 

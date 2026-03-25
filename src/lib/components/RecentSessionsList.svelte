@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
+  import { i18n } from "../i18n.svelte";
   import type { ThreadInfo } from "../types";
   import ShimmerDot from "./ShimmerDot.svelte";
 
@@ -15,7 +16,7 @@
   function formatTime(ts?: number): string {
     if (!ts) return "";
     const date = new Date(ts * 1000);
-    return date.toLocaleDateString(undefined, {
+    return i18n.formatDate(date, {
       month: "short",
       day: "numeric",
       hour: "2-digit",
@@ -27,34 +28,34 @@
 <section class="recent-sessions stack">
   <div class="header split">
     <div class="section-title-row row">
-      <span class="section-title">Recent Sessions</span>
+      <span class="section-title">{i18n.t("recent.title")}</span>
     </div>
     <div class="section-actions row">
-      <button class="refresh-btn" onclick={() => dispatch("refresh")} title="Refresh">↻</button>
+      <button class="refresh-btn" onclick={() => dispatch("refresh")} title={i18n.t("common.refresh")}>↻</button>
     </div>
   </div>
 
   <div class="content stack">
     {#if loading}
       <div class="loading row">
-        <ShimmerDot /> Loading sessions...
+        <ShimmerDot /> {i18n.t("recent.loading")}
       </div>
     {:else if recentThreads.length === 0}
-      <div class="empty row">No sessions yet. Start a task above.</div>
+      <div class="empty row">{i18n.t("recent.empty")}</div>
     {:else}
       <div class="recent">
         <ul class="recent-list">
           {#each recentThreads as thread (thread.id)}
             <li>
               <a class="recent-item split" href="/thread/{thread.id}">
-                <span class="recent-preview">{thread.preview || "New session"}</span>
+                <span class="recent-preview">{thread.preview || i18n.t("common.newSession")}</span>
                 <span class="recent-time">{formatTime(thread.createdAt)}</span>
               </a>
             </li>
           {/each}
         </ul>
         {#if hasMoreThreads}
-          <a class="view-all" href="/sessions">View all sessions</a>
+          <a class="view-all" href="/sessions">{i18n.t("recent.viewAll")}</a>
         {/if}
       </div>
     {/if}

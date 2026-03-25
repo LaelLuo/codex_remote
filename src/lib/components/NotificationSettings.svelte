@@ -1,5 +1,12 @@
 <script lang="ts">
+  import { i18n } from "../i18n.svelte";
   import { notifications } from "../notifications.svelte";
+
+  type Props = {
+    sectionIndex?: string;
+  };
+
+  const { sectionIndex = "04" }: Props = $props();
 
   const isIos =
     typeof navigator !== "undefined" &&
@@ -13,38 +20,39 @@
 
 <div class="section stack">
   <div class="section-header">
-    <span class="section-index">04</span>
-    <span class="section-title">Notifications</span>
+    <span class="section-index">{sectionIndex}</span>
+    <span class="section-title">{i18n.t("notifications.sectionTitle")}</span>
   </div>
   <div class="section-body stack">
     {#if isIos && !isStandalone}
       <p class="hint">
-        To receive notifications on iOS, add this app to your Home Screen:
-        tap the share button, then <strong>Add to Home Screen</strong>.
+        {i18n.t("notifications.iosHint")}
       </p>
     {/if}
 
     {#if notifications.pushAvailable}
       <div class="setting-row">
-        <span class="setting-label">Push notifications</span>
+        <span class="setting-label">{i18n.t("notifications.pushLabel")}</span>
         {#if notifications.pushSubscribed}
           <div class="btn-group">
             <button type="button" class="action-btn" onclick={() => notifications.unsubscribePush()}>
-              Disable
+              {i18n.t("notifications.disable")}
             </button>
             <button type="button" class="action-btn" onclick={() => notifications.sendTestPush()}>
-              Test
+              {i18n.t("notifications.test")}
             </button>
           </div>
         {:else}
           <button type="button" class="action-btn" onclick={() => notifications.subscribePush()}>
-            Enable
+            {i18n.t("notifications.enable")}
           </button>
         {/if}
       </div>
     {:else}
       <p class="hint">
-        Push notifications are not available{isIos && !isStandalone ? " — install as a Home Screen app first" : ""}.
+        {i18n.t("notifications.unavailable", {
+          iosInstallHint: isIos && !isStandalone ? i18n.t("notifications.iosInstallSuffix") : "",
+        })}
       </p>
     {/if}
   </div>

@@ -1,6 +1,7 @@
 <script lang="ts">
   import QRCode from "qrcode";
   import { auth } from "../lib/auth.svelte";
+  import { i18n } from "../lib/i18n.svelte";
   import { navigate } from "../router";
   import AuthPageLayout from "../lib/components/AuthPageLayout.svelte";
 
@@ -52,37 +53,41 @@
 </script>
 
 <svelte:head>
-  <title>Create account — Codex Remote</title>
+  <title>{i18n.t("auth.register.title")}</title>
 </svelte:head>
 
 <AuthPageLayout>
-  <span class="eyebrow">Register</span>
-  <h1>Create account</h1>
+  <span class="eyebrow">{i18n.t("auth.register.eyebrow")}</span>
+  <h1>{i18n.t("auth.register.heading")}</h1>
   <p class="subtitle">
     {#if authMode === "basic"}
-      Create a username for this control-plane.
+      {i18n.t("auth.register.subtitle.basic")}
     {:else if method === "totp"}
-      Scan QR in your authenticator app, then confirm with a code.
+      {i18n.t("auth.register.subtitle.totp")}
     {:else}
-      Register a new account with a passkey.
+      {i18n.t("auth.register.subtitle.passkey")}
     {/if}
   </p>
 
   {#if allowTotp}
     <div class="method-toggle">
-      <button type="button" class:active={method === "passkey"} onclick={() => switchMethod("passkey")}>Passkey</button>
-      <button type="button" class:active={method === "totp"} onclick={() => switchMethod("totp")}>TOTP</button>
+      <button type="button" class:active={method === "passkey"} onclick={() => switchMethod("passkey")}>
+        {i18n.t("auth.register.method.passkey")}
+      </button>
+      <button type="button" class:active={method === "totp"} onclick={() => switchMethod("totp")}>
+        {i18n.t("auth.register.method.totp")}
+      </button>
     </div>
   {/if}
 
-  {#if auth.error}
-    <div class="auth-error">{auth.error}</div>
+  {#if auth.errorText}
+    <div class="auth-error">{auth.errorText}</div>
   {/if}
 
   <input
     type="text"
     class="auth-input"
-    placeholder="Username"
+    placeholder={i18n.t("auth.register.usernamePlaceholder")}
     autocomplete="username"
     autocapitalize="none"
     autocorrect="off"
@@ -96,7 +101,7 @@
   {#if method === "totp" && auth.totpSetup}
     <div class="totp-setup">
       {#if qrDataUrl}
-        <img src={qrDataUrl} alt="TOTP QR code" class="totp-qr" />
+        <img src={qrDataUrl} alt={i18n.t("auth.register.qrAlt")} class="totp-qr" />
       {/if}
       <code class="totp-secret">{auth.totpSetup.secret}</code>
       <input
@@ -124,7 +129,7 @@
         }}
         disabled={auth.busy}
       >
-        Restart setup
+        {i18n.t("auth.register.restartSetup")}
       </button>
     </div>
   {/if}
@@ -135,16 +140,16 @@
     disabled={auth.busy || !newUsername.trim() || (method === "totp" && auth.totpSetup !== null && !totpCode.trim())}
   >
     {#if auth.busy}
-      Working...
+      {i18n.t("common.working")}
     {:else if authMode === "basic"}
-      Create account
+      {i18n.t("common.createAccount")}
     {:else if method === "totp"}
-      {auth.totpSetup ? "Verify code" : "Setup TOTP"}
+      {auth.totpSetup ? i18n.t("auth.register.submit.verifyCode") : i18n.t("auth.register.submit.setupTotp")}
     {:else}
-      Create passkey
+      {i18n.t("auth.register.submit.createPasskey")}
     {/if}
   </button>
-  <a class="link-btn" href="/login">Back to sign in</a>
+  <a class="link-btn" href="/login">{i18n.t("auth.register.backToSignIn")}</a>
 </AuthPageLayout>
 
 <style>
