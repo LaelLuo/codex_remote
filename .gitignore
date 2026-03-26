@@ -35,3 +35,5 @@ services/control-plane/data/
 .DS_Store
 .ideas
 plans
+.playwright-cli
+output/playwright
