@@ -2,12 +2,16 @@
 
 ## Open
 
-- NA-1774494169000 继续盘点除 worktrees 外剩余组件中的 `err.message || fallback string` 路径，优先处理主流程仍可见英文提示。
-  - status: open
-  - created_at: 2026-03-26T11:02:49+08:00
-  - source: agent
+
 
 ## Closed
+
+- NA-1774494169000 继续盘点除 worktrees 外剩余组件中的 `err.message || fallback string` 路径，优先处理主流程仍可见英文提示。
+  - status: obsolete
+  - created_at: 2026-03-26T11:02:49+08:00
+  - closed_at: 2026-03-26T14:25:20.324Z
+  - source: agent
+  - reason: 主线中文化与残余可见英文清理已完成，当前仅剩分支整理与环境级验证事项，不再作为该任务开放后续动作。
 
 - NA-1774463135000 继续盘点其他 store/组件里的历史 `Error.message` 兜底路径，优先处理仍会固化英文的用户可见错误链路。
   - status: done
