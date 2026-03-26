@@ -2,12 +2,19 @@
 
 ## Open
 
-- NA-1774461604000 继续盘点 `socket` RPC 请求层（如 `#requestRpc` / `#requestOrbitControl`）在 send 失败分支的 Error 文本回退，评估是否要统一 descriptor 透传到 Settings/其他页面。
+- NA-1774463135000 继续盘点其他 store/组件里的历史 `Error.message` 兜底路径，优先处理仍会固化英文的用户可见错误链路。
   - status: open
-  - created_at: 2026-03-26T02:00:04+08:00
+  - created_at: 2026-03-26T02:25:35+08:00
   - source: agent
 
 ## Closed
+
+- NA-1774461604000 继续盘点 `socket` RPC 请求层（如 `#requestRpc` / `#requestOrbitControl`）在 send 失败分支的 Error 文本回退，评估是否要统一 descriptor 透传到 Settings/其他页面。
+  - status: done
+  - created_at: 2026-03-26T02:00:04+08:00
+  - closed_at: 2026-03-26T02:25:35+08:00
+  - closed_by: agent
+  - source: agent
 
 - NA-1774452873000 下一轮聚焦 `socket.send` / `messages.interrupt` 等链路残余自由文本，评估是否需要统一 descriptor fallback 并补最小测试。
   - status: done

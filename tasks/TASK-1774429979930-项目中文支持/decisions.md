@@ -9,3 +9,4 @@
 - 2026-03-25T12:26:26.000Z [agent] RPC fallback 不在 socket 层翻译成文本，而是通过 `SocketRpcError.uiMessage` 保留 key/text 语义到 UI 消费层；仅在无法识别该错误类型时回退到 Error.message 文本。
 - 2026-03-25T20:54:33+08:00 [agent] Home 页 submitError 延续 descriptor/key 策略：状态层保存 `UiMessage`（key/text），threads 启动失败优先读取 `getThreadStartErrorMessage`，仅自由文本错误走 text，避免切换语言后旧提示不刷新。
 - 2026-03-26T02:00:04+08:00 [agent] `socket.send` fallback 改为携带 `errorMessage` descriptor（同时保留 `error` 兼容旧调用）；Home/Thread 与 `messages.interrupt` 优先消费 descriptor，真实异常 message 仍以 text 透传。
+- 2026-03-26T02:25:35+08:00 [agent] socket RPC 请求层的 fallback 统一使用 `SocketRpcError`：send 失败沿用 `SendResult.errorMessage`，timeout/connection closed 使用 key descriptor，确保 catch 消费方（如 Settings）可在渲染层翻译并跟随语言切换。

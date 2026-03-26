@@ -39,6 +39,48 @@ class FakeWebSocket {
   }
 }
 
+function installControlledTimers() {
+  const originalSetTimeout = globalThis.setTimeout;
+  const originalClearTimeout = globalThis.clearTimeout;
+
+  type TimeoutEntry = {
+    id: number;
+    fn: () => void;
+    cancelled: boolean;
+  };
+
+  const timers = new Map<number, TimeoutEntry>();
+  let nextId = 1;
+
+  globalThis.setTimeout = ((handler: TimerHandler) => {
+    const id = nextId++;
+    const fn = typeof handler === "function" ? () => handler() : () => {};
+    timers.set(id, { id, fn, cancelled: false });
+    return id as ReturnType<typeof setTimeout>;
+  }) as typeof setTimeout;
+
+  globalThis.clearTimeout = ((id: ReturnType<typeof setTimeout>) => {
+    const entry = timers.get(Number(id));
+    if (entry) {
+      entry.cancelled = true;
+    }
+  }) as typeof clearTimeout;
+
+  return {
+    runAll() {
+      const entries = Array.from(timers.values());
+      timers.clear();
+      for (const entry of entries) {
+        if (!entry.cancelled) entry.fn();
+      }
+    },
+    restore() {
+      globalThis.setTimeout = originalSetTimeout;
+      globalThis.clearTimeout = originalClearTimeout;
+    },
+  };
+}
+
 async function loadFreshSocketModule() {
   const cacheBust = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
   return import(`./socket.svelte.ts?test=${cacheBust}`);
@@ -146,6 +188,69 @@ describe("socket localized error descriptors", () => {
 });
 
 describe("socket rpc helpers", () => {
+  test("rejects request RPC with key descriptor when not connected", async () => {
+    const { getSocketErrorMessage, socket } = await loadFreshSocketModule();
+
+    try {
+      await socket.gitInspect("/repo");
+      throw new Error("Expected request to reject");
+    } catch (error) {
+      expect(getSocketErrorMessage(error)).toEqual({
+        kind: "key",
+        key: "socket.send.notConnected",
+      });
+    }
+  });
+
+  test("rejects pending RPC with timeout descriptor", async () => {
+    const timers = installControlledTimers();
+
+    try {
+      const { getSocketErrorMessage, socket } = await loadFreshSocketModule();
+      socket.connect("ws://localhost:8788/ws/client");
+      const ws = FakeWebSocket.instances[0];
+      ws.open();
+
+      const promise = socket.gitInspect("/repo");
+      timers.runAll();
+
+      try {
+        await promise;
+        throw new Error("Expected request to reject");
+      } catch (error) {
+        expect(getSocketErrorMessage(error)).toEqual({
+          kind: "key",
+          key: "socket.rpc.timeout",
+        });
+        expect(error instanceof Error ? error.message : "").toBe("RPC timeout");
+      }
+      socket.disconnect();
+    } finally {
+      timers.restore();
+    }
+  });
+
+  test("rejects pending RPC with connection-closed descriptor", async () => {
+    const { getSocketErrorMessage, socket } = await loadFreshSocketModule();
+    socket.connect("ws://localhost:8788/ws/client");
+    const ws = FakeWebSocket.instances[0];
+    ws.open();
+
+    const promise = socket.artifactsList("thread-close");
+    socket.disconnect();
+
+    try {
+      await promise;
+      throw new Error("Expected request to reject");
+    } catch (error) {
+      expect(getSocketErrorMessage(error)).toEqual({
+        kind: "key",
+        key: "socket.rpc.connectionClosed",
+      });
+      expect(error instanceof Error ? error.message : "").toBe("Connection closed");
+    }
+  });
+
   test("sends orbit.artifacts.list and resolves response", async () => {
     const { socket } = await loadFreshSocketModule();
     socket.connect("ws://localhost:8788/ws/client");

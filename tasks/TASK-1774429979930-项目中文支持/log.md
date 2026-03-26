@@ -18,3 +18,4 @@
 - 2026-03-26T01:36:11+08:00 [agent] 最小修复 `api.test.ts` 基线阻塞：在测试导入 `api` 前注入 `$state` shim，避免链路导入 `i18n.svelte.ts` 时 `ReferenceError: $state is not defined`；`api.test.ts` 单跑转绿，并验证前端 lib 测试通过（受环境缺少 pytest，`bun run test` 在 Python 阶段失败）。
 - 2026-03-26T01:44:49+08:00 [agent] 修复 `package.json` 的 `ci:local` 构建命令：`bun --env-file .env.example run build` -> `bun run --env-file .env.example build`，并使用 `uv run --with pytest --with httpx --with-requirements services/control-plane/requirements.txt bun run ci:local` 完整链路验证通过。
 - 2026-03-26T02:00:04+08:00 [agent] 新一轮中文支持完成：`socket.send`/`messages.interrupt` 增加 descriptor 语义（key/text），Home/Thread 改为优先消费 descriptor 渲染；补充 `socket.send.*` 词条与 socket/messages/i18n 测试并通过。
+- 2026-03-26T02:25:35+08:00 [agent] 本轮完成 socket RPC 请求层 fallback descriptor 化：`#requestRpc/#requestOrbitControl` send 失败改为 `SocketRpcError`，timeout/connection-closed 改为 key descriptor（`socket.rpc.timeout`/`socket.rpc.connectionClosed`）；补充 socket/i18n 测试并通过。

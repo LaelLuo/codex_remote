@@ -431,6 +431,8 @@ const en: MessageDict = {
   "socket.error.rpc": "RPC error",
   "socket.send.notConnected": "Not connected",
   "socket.send.failed": "Failed to send",
+  "socket.rpc.timeout": "RPC timeout",
+  "socket.rpc.connectionClosed": "Connection closed",
 
   "tool.title.command": "Command",
   "tool.title.file": "File Change",
@@ -876,6 +878,8 @@ const zhCN: MessageDict = {
   "socket.error.rpc": "RPC 错误",
   "socket.send.notConnected": "未连接",
   "socket.send.failed": "发送失败",
+  "socket.rpc.timeout": "RPC 超时",
+  "socket.rpc.connectionClosed": "连接已关闭",
 
   "tool.title.command": "命令",
   "tool.title.file": "文件变更",

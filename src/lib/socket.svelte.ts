@@ -610,7 +610,7 @@ class SocketStore {
       const result = this.send({ id, method, params });
       if (!result.success) {
         this.#consumePendingRpc(id);
-        reject(new Error(result.error ?? "Not connected"));
+        reject(this.#sendResultToRpcError(result));
       }
     });
   }
@@ -629,7 +629,7 @@ class SocketStore {
       });
       if (!result.success) {
         this.#consumePendingRpc(id);
-        reject(new Error(result.error ?? "Not connected"));
+        reject(this.#sendResultToRpcError(result));
       }
     });
   }
@@ -638,7 +638,7 @@ class SocketStore {
     const timeout = setTimeout(() => {
       const pending = this.#consumePendingRpc(id);
       if (!pending) return;
-      pending.reject(new Error("RPC timeout"));
+      pending.reject(new SocketRpcError({ kind: "key", key: "socket.rpc.timeout" }, "RPC timeout"));
     }, RPC_TIMEOUT);
 
     this.#pendingRpc.set(id, {
@@ -668,6 +668,23 @@ class SocketStore {
     if (typeof requestId === "string" && requestId.trim()) return requestId;
     if (typeof requestId === "number" && Number.isFinite(requestId)) return requestId;
     return null;
+  }
+
+  #sendResultToRpcError(result: SendResult): Error {
+    const message = getSendResultErrorMessage(result);
+    if (message) {
+      return new SocketRpcError(message, result.error ?? this.#socketErrorMessageToFallbackText(message));
+    }
+    return new SocketRpcError({ kind: "key", key: "socket.send.notConnected" }, "Not connected");
+  }
+
+  #socketErrorMessageToFallbackText(message: SocketErrorMessage): string {
+    if (message.kind === "text") return message.text;
+    if (message.key === "socket.send.notConnected") return "Not connected";
+    if (message.key === "socket.send.failed") return "Send failed";
+    if (message.key === "socket.rpc.timeout") return "RPC timeout";
+    if (message.key === "socket.rpc.connectionClosed") return "Connection closed";
+    return message.key;
   }
 
   #sendRaw(message: Record<string, unknown>): SendResult {
@@ -760,7 +777,9 @@ class SocketStore {
     for (const key of pendingKeys) {
       const pending = this.#consumePendingRpc(key);
       if (pending) {
-        pending.reject(new Error("Connection closed"));
+        pending.reject(
+          new SocketRpcError({ kind: "key", key: "socket.rpc.connectionClosed" }, "Connection closed"),
+        );
       }
     }
     if (this.#socket) {

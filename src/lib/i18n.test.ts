@@ -183,6 +183,8 @@ describe("i18n store", () => {
     expect(i18n.t("socket.error.rpc")).toBe("RPC error");
     expect(i18n.t("socket.send.notConnected")).toBe("Not connected");
     expect(i18n.t("socket.send.failed")).toBe("Failed to send");
+    expect(i18n.t("socket.rpc.timeout")).toBe("RPC timeout");
+    expect(i18n.t("socket.rpc.connectionClosed")).toBe("Connection closed");
 
     i18n.set("zh-CN");
     expect(i18n.t("reasoning.thinking")).toBe("思考中...");
@@ -192,6 +194,8 @@ describe("i18n store", () => {
     expect(i18n.t("socket.error.rpc")).toBe("RPC 错误");
     expect(i18n.t("socket.send.notConnected")).toBe("未连接");
     expect(i18n.t("socket.send.failed")).toBe("发送失败");
+    expect(i18n.t("socket.rpc.timeout")).toBe("RPC 超时");
+    expect(i18n.t("socket.rpc.connectionClosed")).toBe("连接已关闭");
   });
 
   test("translates thread start fallback labels", async () => {
