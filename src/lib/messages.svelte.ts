@@ -6,6 +6,7 @@ import type {
   PlanStep,
   RpcMessage,
   TurnStatus,
+  UiMessageDescriptor,
   UserInputQuestion,
   UserInputRequest,
 } from "./types";
@@ -82,6 +83,14 @@ function sanitizeCliOutput(value: string): string {
   cleaned = cleaned.replace(/\[(?:\d{1,3};?)+m/g, "");
   cleaned = cleaned.replace(/\[(?:\d{1,3};?)+[GJK]/g, "");
   return cleaned;
+}
+
+function messageKey(key: string, params?: Record<string, string | number>): UiMessageDescriptor {
+  return { kind: "key", key, ...(params ? { params } : {}) };
+}
+
+function messageText(text: string): UiMessageDescriptor {
+  return { kind: "text", text };
 }
 
 class MessagesStore {
@@ -1119,26 +1128,28 @@ class MessagesStore {
 
       // Determine type from method name
       let approvalType: ApprovalRequest["type"] = "other";
-      let description = "";
+      let fallbackDescriptionKey = "approval.description.actionRequired";
 
       if (method === "item/fileChange/requestApproval") {
         approvalType = "file";
-        description = reason || "File change requires approval";
+        fallbackDescriptionKey = "approval.description.fileChangeRequired";
       } else if (method === "item/commandExecution/requestApproval") {
         approvalType = "command";
-        description = reason || "Command execution requires approval";
+        fallbackDescriptionKey = "approval.description.commandExecutionRequired";
       } else if (method === "item/mcpToolCall/requestApproval") {
         approvalType = "mcp";
-        description = reason || "MCP tool call requires approval";
-      } else {
-        description = reason || "Action requires approval";
+        fallbackDescriptionKey = "approval.description.mcpToolCallRequired";
       }
+
+      const descriptionMessage = reason ? messageText(reason) : messageKey(fallbackDescriptionKey);
+      const description = reason ?? "";
 
       const approval: ApprovalRequest = {
         id: itemId,
         rpcId, // Store the RPC ID so we can respond to it
         type: approvalType,
         description,
+        descriptionMessage,
         status: "pending",
       };
 
@@ -1228,14 +1239,31 @@ class MessagesStore {
             return;
           }
           const result = item.error ?? item.result ?? "";
-          const text = `Tool: ${item.tool}\n${result ? JSON.stringify(result, null, 2) : ""}`;
-          this.#upsert(threadId, { id: itemId, role: "tool", kind: "mcp", text, threadId });
+          const output = result ? JSON.stringify(result, null, 2) : "";
+          this.#upsert(threadId, {
+            id: itemId,
+            role: "tool",
+            kind: "mcp",
+            text: output,
+            threadId,
+            metadata: {
+              toolName: typeof item.tool === "string" ? item.tool : undefined,
+            },
+          });
           this.#clearStreaming(threadId, itemId);
           return;
         }
         case "webSearch": {
-          const text = `Search: ${item.query}`;
-          this.#upsert(threadId, { id: itemId, role: "tool", kind: "web", text, threadId });
+          this.#upsert(threadId, {
+            id: itemId,
+            role: "tool",
+            kind: "web",
+            text: "",
+            threadId,
+            metadata: {
+              webQuery: typeof item.query === "string" ? item.query : undefined,
+            },
+          });
           return;
         }
         case "imageView": {
@@ -1244,14 +1272,26 @@ class MessagesStore {
         }
         case "enteredReviewMode": {
           const review = (item.review as string) || "";
-          const text = review ? `Review started: ${review}` : "Review started.";
-          this.#upsert(threadId, { id: itemId, role: "tool", kind: "review", text, threadId });
+          this.#upsert(threadId, {
+            id: itemId,
+            role: "tool",
+            kind: "review",
+            text: review,
+            threadId,
+            metadata: { reviewState: "started" },
+          });
           return;
         }
         case "exitedReviewMode": {
           const review = (item.review as string) || "";
-          const text = review || "Review complete.";
-          this.#upsert(threadId, { id: itemId, role: "tool", kind: "review", text, threadId });
+          this.#upsert(threadId, {
+            id: itemId,
+            role: "tool",
+            kind: "review",
+            text: review,
+            threadId,
+            metadata: { reviewState: "completed" },
+          });
           return;
         }
         case "plan": {
@@ -1265,14 +1305,23 @@ class MessagesStore {
           const receivers = (item.receiverThreadIds as string[]) || [];
           const prompt = (item.prompt as string) || "";
           const status = (item.status as string) || "completed";
-          const lines = [`${tool}: ${receivers.join(", ") || "—"}`];
-          if (prompt) lines.push(prompt);
-          lines.push(`Status: ${status}`);
-          this.#upsert(threadId, { id: itemId, role: "tool", kind: "collab", text: lines.join("\n"), threadId });
+          this.#upsert(threadId, {
+            id: itemId,
+            role: "tool",
+            kind: "collab",
+            text: "",
+            threadId,
+            metadata: {
+              collabTool: tool,
+              collabReceivers: receivers,
+              collabPrompt: prompt,
+              collabStatus: status,
+            },
+          });
           return;
         }
         case "contextCompaction": {
-          this.#upsert(threadId, { id: itemId, role: "tool", kind: "compaction", text: "Context compacted", threadId });
+          this.#upsert(threadId, { id: itemId, role: "tool", kind: "compaction", text: "", threadId });
           return;
         }
         default:
@@ -1361,12 +1410,16 @@ class MessagesStore {
                 messages.push(this.#buildImageMessageFromPayload(threadId, id, maybeImage));
                 break;
               }
+              const result = item.error ?? item.result ?? "";
               messages.push({
                 id,
                 role: "tool",
                 kind: "mcp",
-                text: `Tool: ${item.tool}\n${JSON.stringify(item.error ?? item.result ?? "", null, 2)}`,
+                text: result ? JSON.stringify(result, null, 2) : "",
                 threadId,
+                metadata: {
+                  toolName: typeof item.tool === "string" ? item.tool : undefined,
+                },
               });
             }
             break;
@@ -1376,8 +1429,11 @@ class MessagesStore {
               id,
               role: "tool",
               kind: "web",
-              text: `Search: ${item.query}`,
+              text: "",
               threadId,
+              metadata: {
+                webQuery: typeof item.query === "string" ? item.query : undefined,
+              },
             });
             break;
 
@@ -1391,8 +1447,9 @@ class MessagesStore {
               id,
               role: "tool",
               kind: "review",
-              text: review ? `Review started: ${review}` : "Review started.",
+              text: review,
               threadId,
+              metadata: { reviewState: "started" },
             });
             break;
           }
@@ -1403,8 +1460,9 @@ class MessagesStore {
               id,
               role: "tool",
               kind: "review",
-              text: review || "Review complete.",
+              text: review,
               threadId,
+              metadata: { reviewState: "completed" },
             });
             break;
           }
@@ -1420,15 +1478,24 @@ class MessagesStore {
             const receivers = (item.receiverThreadIds as string[]) || [];
             const prompt = (item.prompt as string) || "";
             const status = (item.status as string) || "completed";
-            const lines = [`${tool}: ${receivers.join(", ") || "—"}`];
-            if (prompt) lines.push(prompt);
-            lines.push(`Status: ${status}`);
-            messages.push({ id, role: "tool", kind: "collab", text: lines.join("\n"), threadId });
+            messages.push({
+              id,
+              role: "tool",
+              kind: "collab",
+              text: "",
+              threadId,
+              metadata: {
+                collabTool: tool,
+                collabReceivers: receivers,
+                collabPrompt: prompt,
+                collabStatus: status,
+              },
+            });
             break;
           }
 
           case "contextCompaction":
-            messages.push({ id, role: "tool", kind: "compaction", text: "Context compacted", threadId });
+            messages.push({ id, role: "tool", kind: "compaction", text: "", threadId });
             break;
         }
       }

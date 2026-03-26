@@ -130,6 +130,10 @@
     }
 
     if (kind === "mcp") {
+      const toolNameFromMetadata = message.metadata?.toolName?.trim();
+      if (toolNameFromMetadata) {
+        return { title: toolNameFromMetadata, content: text };
+      }
       const match = text.match(/^Tool:\s*(.+?)(?:\n|$)/);
       const toolName = match?.[1] || i18n.t("tool.title.mcp");
       const content = match ? text.slice(match[0].length) : text;
@@ -137,6 +141,8 @@
     }
 
     if (kind === "web") {
+      const query = message.metadata?.webQuery?.trim();
+      if (query) return { title: query, content: "" };
       const match = text.match(/^Search:\s*(.+?)(?:\n|$)/);
       return { title: match?.[1] || i18n.t("tool.title.web"), content: "" };
     }
@@ -152,8 +158,58 @@
     }
 
     if (kind === "collab") {
+      const collabTool = message.metadata?.collabTool?.trim();
+      if (collabTool) {
+        const receivers = message.metadata?.collabReceivers ?? [];
+        const prompt = message.metadata?.collabPrompt?.trim() ?? "";
+        const statusText = message.metadata?.collabStatus?.trim() || "completed";
+        const lines = [];
+        if (prompt) lines.push(prompt);
+        lines.push(i18n.t("message.statusLabel", { status: statusText }));
+        return {
+          title: `${collabTool}: ${receivers.join(", ") || "—"}`,
+          content: lines.join("\n"),
+        };
+      }
       const lines = text.split("\n");
       return { title: lines[0] || i18n.t("tool.title.agent"), content: lines.slice(1).join("\n") };
+    }
+
+    if (kind === "compaction") {
+      return { title: i18n.t("message.contextCompacted"), content: "" };
+    }
+
+    if (kind === "review") {
+      const reviewState = message.metadata?.reviewState;
+      const reviewName = text.trim();
+      if (reviewState === "started") {
+        return {
+          title: i18n.t("tool.title.review"),
+          content: reviewName
+            ? i18n.t("message.reviewStartedWithName", { review: reviewName })
+            : i18n.t("message.reviewStarted"),
+        };
+      }
+      if (reviewState === "completed") {
+        return {
+          title: i18n.t("tool.title.review"),
+          content: reviewName || i18n.t("message.reviewComplete"),
+        };
+      }
+      const startedMatch = reviewName.match(/^Review started:\s*(.+)$/);
+      if (startedMatch) {
+        return {
+          title: i18n.t("tool.title.review"),
+          content: i18n.t("message.reviewStartedWithName", { review: startedMatch[1] }),
+        };
+      }
+      if (reviewName === "Review started.") {
+        return { title: i18n.t("tool.title.review"), content: i18n.t("message.reviewStarted") };
+      }
+      if (reviewName === "Review complete.") {
+        return { title: i18n.t("tool.title.review"), content: i18n.t("message.reviewComplete") };
+      }
+      return { title: i18n.t("tool.title.review"), content: reviewName };
     }
 
     return { title: text.slice(0, 50) || i18n.t("tool.title.default"), content: text };

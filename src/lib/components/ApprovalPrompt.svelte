@@ -33,6 +33,13 @@
     cancelled: { text: i18n.t("approval.status.cancelled"), color: "var(--cli-text-muted)" },
   }));
 
+  const descriptionText = $derived.by(() => {
+    const message = approval.descriptionMessage;
+    if (message?.kind === "text") return message.text;
+    if (message?.kind === "key") return i18n.t(message.key, message.params);
+    return approval.description;
+  });
+
   function handleOptionClick(index: number) {
     if (approval.status !== "pending") return;
     selectedIndex = index;
@@ -90,8 +97,8 @@
       <div class="file-path">{approval.filePath}</div>
     {/if}
 
-    {#if approval.description && approval.description !== approval.command}
-      <div class="description">{approval.description}</div>
+    {#if descriptionText && descriptionText !== approval.command}
+      <div class="description">{descriptionText}</div>
     {/if}
   </div>
 

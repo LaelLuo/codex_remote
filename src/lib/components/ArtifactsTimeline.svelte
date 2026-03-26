@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { ArtifactsUiMessage } from "../artifacts.svelte";
   import type { OrbitArtifact } from "../types";
   import { i18n } from "../i18n.svelte";
 
@@ -6,7 +7,7 @@
     threadId?: string | null;
     artifacts?: OrbitArtifact[];
     loading?: boolean;
-    error?: string | null;
+    error?: ArtifactsUiMessage | null;
     onRefresh?: () => void;
   };
 
@@ -34,6 +35,12 @@
     if (!Array.isArray(maybePaths)) return [];
     return maybePaths.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0);
   }
+
+  function renderError(message: ArtifactsUiMessage | null): string {
+    if (!message) return "";
+    if (message.kind === "text") return message.text;
+    return i18n.t(message.key, message.params);
+  }
 </script>
 
 <section class="artifacts-panel stack" aria-live="polite">
@@ -51,7 +58,7 @@
   </header>
 
   {#if error}
-    <p class="hint hint-error">{error}</p>
+    <p class="hint hint-error">{renderError(error)}</p>
   {/if}
 
   {#if loading && artifacts.length === 0}

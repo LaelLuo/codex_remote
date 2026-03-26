@@ -1,5 +1,5 @@
 import type { OrbitArtifact } from "./types";
-import { socket } from "./socket.svelte";
+import { getSocketErrorMessage, socket, type SocketErrorMessage } from "./socket.svelte";
 import {
   extractArtifactIdsFromDispatch,
   extractMultiDispatchPayloads,
@@ -9,10 +9,24 @@ import {
 
 const STORE_KEY = "__codex_remote_artifacts_store__";
 
+export type ArtifactsUiMessage = SocketErrorMessage;
+
+export function toArtifactsUiMessage(error: unknown, fallbackKey: string): ArtifactsUiMessage {
+  const socketMessage = getSocketErrorMessage(error);
+  if (socketMessage) return socketMessage;
+  if (error instanceof Error && error.message.trim()) {
+    return { kind: "text", text: error.message };
+  }
+  if (typeof error === "string" && error.trim()) {
+    return { kind: "text", text: error };
+  }
+  return { kind: "key", key: fallbackKey };
+}
+
 class ArtifactsStore {
   #byThread = $state<Map<string, OrbitArtifact[]>>(new Map());
   #loadingByThread = $state<Map<string, boolean>>(new Map());
-  #errorByThread = $state<Map<string, string | null>>(new Map());
+  #errorByThread = $state<Map<string, ArtifactsUiMessage | null>>(new Map());
   #requestTokenByThread = new Map<string, number>();
   #requestCounter = 0;
 
@@ -30,7 +44,7 @@ class ArtifactsStore {
     return this.#loadingByThread.get(threadId) ?? false;
   }
 
-  getThreadError(threadId: string | null): string | null {
+  getThreadError(threadId: string | null): ArtifactsUiMessage | null {
     if (!threadId) return null;
     return this.#errorByThread.get(threadId) ?? null;
   }
@@ -62,8 +76,10 @@ class ArtifactsStore {
       this.#errorByThread = new Map(this.#errorByThread).set(normalized, null);
     } catch (err) {
       if (this.#requestTokenByThread.get(normalized) !== requestToken) return;
-      const message = err instanceof Error ? err.message : "Failed to load artifacts";
-      this.#errorByThread = new Map(this.#errorByThread).set(normalized, message);
+      this.#errorByThread = new Map(this.#errorByThread).set(
+        normalized,
+        toArtifactsUiMessage(err, "artifacts.error.loadFailed"),
+      );
     } finally {
       if (this.#requestTokenByThread.get(normalized) !== requestToken) return;
       this.#loadingByThread = new Map(this.#loadingByThread).set(normalized, false);

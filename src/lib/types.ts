@@ -55,6 +55,10 @@ export type MessageKind =
   | "collab"
   | "compaction";
 
+export type UiMessageDescriptor =
+  | { kind: "key"; key: string; params?: Record<string, string | number> }
+  | { kind: "text"; text: string };
+
 export interface FileChangeEntry {
   path: string;
   diff?: string;
@@ -74,6 +78,13 @@ export interface MessageMetadata {
   imageWidth?: number;
   imageHeight?: number;
   imageBytes?: number;
+  toolName?: string;
+  webQuery?: string;
+  reviewState?: "started" | "completed";
+  collabTool?: string;
+  collabReceivers?: string[];
+  collabPrompt?: string;
+  collabStatus?: string;
 }
 
 export interface TurnImageInput {
@@ -89,6 +100,7 @@ export interface ApprovalRequest {
   rpcId: number; // The JSON-RPC request ID to respond to
   type: "command" | "file" | "mcp" | "other";
   description: string;
+  descriptionMessage?: UiMessageDescriptor;
   command?: string;
   filePath?: string;
   toolName?: string;

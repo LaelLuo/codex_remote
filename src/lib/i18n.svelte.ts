@@ -296,6 +296,10 @@ const en: MessageDict = {
   "approval.status.approved": "Approved",
   "approval.status.declined": "Declined",
   "approval.status.cancelled": "Cancelled",
+  "approval.description.fileChangeRequired": "File change requires approval",
+  "approval.description.commandExecutionRequired": "Command execution requires approval",
+  "approval.description.mcpToolCallRequired": "MCP tool call requires approval",
+  "approval.description.actionRequired": "Action requires approval",
 
   "userInput.header.questions": "Questions",
   "userInput.placeholder.answer": "Type your answer...",
@@ -382,6 +386,7 @@ const en: MessageDict = {
   "artifacts.refreshing": "Refreshing...",
   "artifacts.loading": "Loading artifacts timeline...",
   "artifacts.empty": "No artifacts yet for this thread.",
+  "artifacts.error.loadFailed": "Failed to load artifacts",
 
   "projectPicker.browseDirectories": "Browse directories",
   "projectPicker.closeBrowser": "Close browser",
@@ -428,6 +433,10 @@ const en: MessageDict = {
   "reasoning.thoughtForFewSeconds": "Thought for a few seconds",
 
   "message.contextCompacted": "Context compacted",
+  "message.reviewStarted": "Review started.",
+  "message.reviewStartedWithName": "Review started: {review}",
+  "message.reviewComplete": "Review complete.",
+  "message.statusLabel": "Status: {status}",
 
   "socket.error.noServerUrlConfigured": "No server URL configured. Set one in Settings.",
   "socket.error.invalidUrl": "Invalid URL: {url}",
@@ -748,6 +757,10 @@ const zhCN: MessageDict = {
   "approval.status.approved": "已批准",
   "approval.status.declined": "已拒绝",
   "approval.status.cancelled": "已取消",
+  "approval.description.fileChangeRequired": "文件变更需要审批",
+  "approval.description.commandExecutionRequired": "命令执行需要审批",
+  "approval.description.mcpToolCallRequired": "MCP 工具调用需要审批",
+  "approval.description.actionRequired": "该操作需要审批",
 
   "userInput.header.questions": "问题",
   "userInput.placeholder.answer": "请输入你的回答...",
@@ -834,6 +847,7 @@ const zhCN: MessageDict = {
   "artifacts.refreshing": "刷新中...",
   "artifacts.loading": "正在加载产物时间线...",
   "artifacts.empty": "该线程暂时没有产物。",
+  "artifacts.error.loadFailed": "加载产物失败",
 
   "projectPicker.browseDirectories": "浏览目录",
   "projectPicker.closeBrowser": "关闭浏览器",
@@ -880,6 +894,10 @@ const zhCN: MessageDict = {
   "reasoning.thoughtForFewSeconds": "思考了几秒钟",
 
   "message.contextCompacted": "上下文已压缩",
+  "message.reviewStarted": "审查已开始。",
+  "message.reviewStartedWithName": "审查已开始：{review}",
+  "message.reviewComplete": "审查已完成。",
+  "message.statusLabel": "状态：{status}",
 
   "socket.error.noServerUrlConfigured": "未配置服务端 URL，请在设置页填写。",
   "socket.error.invalidUrl": "无效 URL：{url}",

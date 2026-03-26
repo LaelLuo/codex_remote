@@ -116,4 +116,128 @@ describe("messages turn terminal handling", () => {
       key: "socket.send.notConnected",
     });
   });
+
+  test("stores approval fallback as key descriptor instead of fixed English text", async () => {
+    const { messages } = await loadFreshMessagesModule();
+    messages.handleMessage({
+      id: 99,
+      method: "item/commandExecution/requestApproval",
+      params: {
+        threadId: "thread-1",
+        itemId: "approval-1",
+      },
+    });
+
+    const approvalMessage = messages.getThreadMessages("thread-1").find((item) => item.id === "approval-approval-1");
+    expect(approvalMessage?.approval?.descriptionMessage).toEqual({
+      kind: "key",
+      key: "approval.description.commandExecutionRequired",
+    });
+    expect(approvalMessage?.approval?.description).toBe("");
+  });
+
+  test("stores tool transcript metadata for localization without English prefixes", async () => {
+    const { messages } = await loadFreshMessagesModule();
+
+    messages.handleMessage({
+      method: "item/completed",
+      params: {
+        threadId: "thread-1",
+        item: {
+          id: "mcp-1",
+          type: "mcpToolCall",
+          tool: "search_web",
+          result: { ok: true },
+        },
+      },
+    });
+    messages.handleMessage({
+      method: "item/completed",
+      params: {
+        threadId: "thread-1",
+        item: {
+          id: "web-1",
+          type: "webSearch",
+          query: "codex remote",
+        },
+      },
+    });
+    messages.handleMessage({
+      method: "item/completed",
+      params: {
+        threadId: "thread-1",
+        item: {
+          id: "review-1",
+          type: "enteredReviewMode",
+        },
+      },
+    });
+    messages.handleMessage({
+      method: "item/completed",
+      params: {
+        threadId: "thread-1",
+        item: {
+          id: "collab-1",
+          type: "collabAgentToolCall",
+          tool: "spawnAgent",
+          receiverThreadIds: ["thread-2"],
+          prompt: "Check logs",
+          status: "running",
+        },
+      },
+    });
+    messages.handleMessage({
+      method: "item/completed",
+      params: {
+        threadId: "thread-1",
+        item: {
+          id: "compact-1",
+          type: "contextCompaction",
+        },
+      },
+    });
+
+    const byId = new Map(messages.getThreadMessages("thread-1").map((item) => [item.id, item]));
+    expect(byId.get("mcp-1")?.metadata?.toolName).toBe("search_web");
+    expect(byId.get("mcp-1")?.text.startsWith("Tool:")).toBe(false);
+    expect(byId.get("web-1")?.metadata?.webQuery).toBe("codex remote");
+    expect(byId.get("web-1")?.text).toBe("");
+    expect(byId.get("review-1")?.metadata?.reviewState).toBe("started");
+    expect(byId.get("review-1")?.text).toBe("");
+    expect(byId.get("collab-1")?.metadata?.collabStatus).toBe("running");
+    expect(byId.get("compact-1")?.text).toBe("");
+  });
+
+  test("hydrates replayed tool items with localization metadata", async () => {
+    const { messages } = await loadFreshMessagesModule();
+
+    messages.handleMessage({
+      result: {
+        thread: {
+          id: "thread-1",
+          turns: [
+            {
+              items: [
+                {
+                  id: "history-web",
+                  type: "webSearch",
+                  query: "history query",
+                },
+                {
+                  id: "history-review",
+                  type: "exitedReviewMode",
+                },
+              ],
+            },
+          ],
+        },
+      },
+    });
+
+    const byId = new Map(messages.getThreadMessages("thread-1").map((item) => [item.id, item]));
+    expect(byId.get("history-web")?.metadata?.webQuery).toBe("history query");
+    expect(byId.get("history-web")?.text).toBe("");
+    expect(byId.get("history-review")?.metadata?.reviewState).toBe("completed");
+    expect(byId.get("history-review")?.text).toBe("");
+  });
 });

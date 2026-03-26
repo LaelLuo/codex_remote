@@ -186,4 +186,36 @@ describe("artifacts store", () => {
 
     expect(artifacts.getThreadArtifacts("thread-1").map((item) => item.id)).toEqual(["artifact-1"]);
   });
+
+  test("stores fallback error as key descriptor when load fails without message", async () => {
+    const protocolHandlers: Array<(msg: Record<string, unknown>) => void> = [];
+    const socket = {
+      artifactsList: mock(async () => {
+        throw {};
+      }),
+      onProtocol(handler: (msg: Record<string, unknown>) => void) {
+        protocolHandlers.push(handler);
+        return () => {};
+      },
+    };
+
+    Object.defineProperty(globalThis, "$state", {
+      value: <T>(value: T) => value,
+      configurable: true,
+      writable: true,
+    });
+    mock.module("./socket.svelte", () => ({
+      socket,
+      getSocketErrorMessage: () => null,
+    }));
+    resetArtifactsSingleton();
+
+    const { artifacts } = await import("./artifacts.svelte.ts");
+    await artifacts.requestThread("thread-1");
+
+    expect(artifacts.getThreadError("thread-1")).toEqual({
+      kind: "key",
+      key: "artifacts.error.loadFailed",
+    });
+  });
 });

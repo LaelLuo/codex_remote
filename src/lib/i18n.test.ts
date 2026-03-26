@@ -219,4 +219,28 @@ describe("i18n store", () => {
     expect(i18n.t("threads.error.selectDeviceBeforeSession")).toBe("创建会话前请先在设置中选择设备。");
     expect(i18n.t("threads.error.selectedDeviceOffline")).toBe("所选设备离线，请在设置中选择其他设备。");
   });
+
+  test("translates transcript fallback labels for approval, review, and artifacts", async () => {
+    const { i18n } = await loadI18n();
+    expect(i18n.t("approval.description.fileChangeRequired")).toBe("File change requires approval");
+    expect(i18n.t("approval.description.commandExecutionRequired")).toBe("Command execution requires approval");
+    expect(i18n.t("approval.description.mcpToolCallRequired")).toBe("MCP tool call requires approval");
+    expect(i18n.t("approval.description.actionRequired")).toBe("Action requires approval");
+    expect(i18n.t("message.reviewStarted")).toBe("Review started.");
+    expect(i18n.t("message.reviewStartedWithName", { review: "security" })).toBe("Review started: security");
+    expect(i18n.t("message.reviewComplete")).toBe("Review complete.");
+    expect(i18n.t("message.statusLabel", { status: "running" })).toBe("Status: running");
+    expect(i18n.t("artifacts.error.loadFailed")).toBe("Failed to load artifacts");
+
+    i18n.set("zh-CN");
+    expect(i18n.t("approval.description.fileChangeRequired")).toBe("文件变更需要审批");
+    expect(i18n.t("approval.description.commandExecutionRequired")).toBe("命令执行需要审批");
+    expect(i18n.t("approval.description.mcpToolCallRequired")).toBe("MCP 工具调用需要审批");
+    expect(i18n.t("approval.description.actionRequired")).toBe("该操作需要审批");
+    expect(i18n.t("message.reviewStarted")).toBe("审查已开始。");
+    expect(i18n.t("message.reviewStartedWithName", { review: "security" })).toBe("审查已开始：security");
+    expect(i18n.t("message.reviewComplete")).toBe("审查已完成。");
+    expect(i18n.t("message.statusLabel", { status: "running" })).toBe("状态：running");
+    expect(i18n.t("artifacts.error.loadFailed")).toBe("加载产物失败");
+  });
 });
