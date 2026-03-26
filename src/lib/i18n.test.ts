@@ -261,4 +261,20 @@ describe("i18n store", () => {
     expect(i18n.t("release.error.startFailed")).toBe("启动发布失败");
     expect(i18n.t("release.error.statusLoadFailed")).toBe("加载发布状态失败");
   });
+
+  test("translates artifact type labels", async () => {
+    const { i18n } = await loadI18n();
+    expect(i18n.t("artifacts.type.artifact")).toBe("Artifact");
+    expect(i18n.t("artifacts.type.fileChange")).toBe("File Change");
+    expect(i18n.t("artifacts.type.toolCall")).toBe("Tool Call");
+    expect(i18n.t("artifacts.type.webSearch")).toBe("Web Search");
+    expect(i18n.t("artifacts.type.collabCall")).toBe("Collab Call");
+
+    i18n.set("zh-CN");
+    expect(i18n.t("artifacts.type.artifact")).toBe("产物");
+    expect(i18n.t("artifacts.type.fileChange")).toBe("文件变更");
+    expect(i18n.t("artifacts.type.toolCall")).toBe("工具调用");
+    expect(i18n.t("artifacts.type.webSearch")).toBe("网页搜索");
+    expect(i18n.t("artifacts.type.collabCall")).toBe("协作调用");
+  });
 });

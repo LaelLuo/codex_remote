@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { artifactTypeKey } from "../artifacts";
   import type { ArtifactsUiMessage } from "../artifacts.svelte";
   import type { OrbitArtifact } from "../types";
   import { i18n } from "../i18n.svelte";
@@ -41,6 +42,25 @@
     if (message.kind === "text") return message.text;
     return i18n.t(message.key, message.params);
   }
+
+  function renderArtifactType(type: string): string {
+    const key = artifactTypeKey(type);
+    return key ? i18n.t(key) : type;
+  }
+
+  function renderArtifactTitle(artifact: OrbitArtifact): string {
+    const title = artifact.title?.trim();
+    if (!title) return renderArtifactType(artifact.type);
+
+    const typeKey = artifactTypeKey(artifact.type);
+    if (typeKey && artifactTypeKey(title) === typeKey) {
+      return i18n.t(typeKey);
+    }
+
+    const legacyKey = artifactTypeKey(title);
+    if (legacyKey) return i18n.t(legacyKey);
+    return title;
+  }
 </script>
 
 <section class="artifacts-panel stack" aria-live="polite">
@@ -70,11 +90,11 @@
       {#each artifacts as artifact (artifact.id)}
         <li class="timeline-item stack">
           <div class="timeline-head row">
-            <span class="artifact-title">{artifact.title}</span>
+            <span class="artifact-title">{renderArtifactTitle(artifact)}</span>
             <span class="artifact-ts">{formatTimestamp(artifact.createdAt)}</span>
           </div>
           <div class="timeline-meta row">
-            <span class="meta-chip">{artifact.type}</span>
+            <span class="meta-chip">{renderArtifactType(artifact.type)}</span>
             {#if artifact.status}
               <span class="meta-chip status">{artifact.status}</span>
             {/if}

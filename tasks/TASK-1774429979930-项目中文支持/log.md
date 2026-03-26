@@ -23,3 +23,5 @@
 - 2026-03-26T11:43:06+08:00 [agent] 本轮完成 transcript/tool + artifacts 可见英文清理：`messages.svelte.ts` 将 approval/review/mcp/web/collab/compaction fallback 改为 descriptor+metadata，不再固化英文前缀；`Tool.svelte`/`ApprovalPrompt.svelte` 在渲染层翻译；`artifacts.svelte.ts` 错误改为 key/text descriptor 并在 `ArtifactsTimeline.svelte` 渲染；补充 messages/artifacts/i18n 测试并通过 lint。
 - 2026-03-26T11:56:19+08:00 [agent] 返修 compaction 展示回归：在 `Tool.svelte` 增加 `kind === "compaction"` 的本地化标题分支（`message.contextCompacted`），避免消息被 Tool 路径消费时出现空白条目。
 - 2026-03-26T12:13:37+08:00 [agent] 本轮完成 release-cockpit 文案 descriptor 化：`release-cockpit.svelte.ts` 的 info/error 从 string 改为 key/text，成功与 fallback 文案走 i18n key，socket 结构化错误优先透传；`ReleaseCockpit.svelte` 改为渲染层翻译；补充 release-cockpit 与 i18n 测试并通过 lint。
+- 2026-03-26T12:24:51+08:00 [agent] 本轮完成 artifacts 类型标签本地化：`artifacts.ts` 移除 `humanizeArtifactType` 英文固化，改为 `artifactTypeKey` 映射 i18n key；`ArtifactsTimeline.svelte` 在渲染层翻译 type/title（含旧英文标题兜底识别）；补充 artifacts/i18n 测试并通过 lint。
+- 2026-03-26T12:29:28+08:00 [agent] 返修历史兼容遗漏：`artifactTypeKey` 新增对旧持久化标题 `tool call` / `collab call` 的识别映射，确保 artifacts 时间线切换中文时不再残留英文；补充对应单测并通过。

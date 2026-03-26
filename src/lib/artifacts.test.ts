@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
-import { extractMultiDispatchPayloads, normalizeArtifactsListResult } from "./artifacts";
+import { artifactTypeKey, extractMultiDispatchPayloads, normalizeArtifactsListResult } from "./artifacts";
 
 const STORE_KEY = "__codex_remote_artifacts_store__";
 
@@ -217,5 +217,33 @@ describe("artifacts store", () => {
       kind: "key",
       key: "artifacts.error.loadFailed",
     });
+  });
+
+  test("maps artifact type tokens to translation keys", () => {
+    expect(artifactTypeKey("fileChange")).toBe("artifacts.type.fileChange");
+    expect(artifactTypeKey("file change")).toBe("artifacts.type.fileChange");
+    expect(artifactTypeKey("mcp_tool_call")).toBe("artifacts.type.toolCall");
+    expect(artifactTypeKey("tool call")).toBe("artifacts.type.toolCall");
+    expect(artifactTypeKey("web-search")).toBe("artifacts.type.webSearch");
+    expect(artifactTypeKey("collab call")).toBe("artifacts.type.collabCall");
+    expect(artifactTypeKey("unknown")).toBeNull();
+  });
+
+  test("keeps type fallback title as raw token for UI-layer translation", () => {
+    const result = normalizeArtifactsListResult(
+      {
+        artifacts: [
+          {
+            id: "artifact-raw-type",
+            threadId: "thread-1",
+            type: "fileChange",
+            createdAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+      },
+      "thread-1",
+    );
+
+    expect(result.artifacts[0]?.title).toBe("fileChange");
   });
 });

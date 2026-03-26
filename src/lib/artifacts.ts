@@ -108,22 +108,26 @@ function extractPayloadPaths(payload: Record<string, unknown> | null): string[] 
   return uniqStrings([...fromChanges, ...fromCommand]);
 }
 
-function humanizeArtifactType(rawType: string): string {
+export function artifactTypeKey(rawType: string): string | null {
   const normalized = rawType.trim().toLowerCase();
-  if (!normalized) return "artifact";
+  if (!normalized) return "artifacts.type.artifact";
+  const token = normalized.replace(/[\s._-]+/g, "");
   const map: Record<string, string> = {
-    command: "command",
-    commandexecution: "command",
-    file: "file change",
-    filechange: "file change",
-    image: "image",
-    imageview: "image",
-    tool: "tool call",
-    mcptoolcall: "tool call",
-    websearch: "web search",
-    collabagenttoolcall: "collab call",
+    artifact: "artifacts.type.artifact",
+    command: "artifacts.type.command",
+    commandexecution: "artifacts.type.command",
+    file: "artifacts.type.fileChange",
+    filechange: "artifacts.type.fileChange",
+    image: "artifacts.type.image",
+    imageview: "artifacts.type.image",
+    tool: "artifacts.type.toolCall",
+    toolcall: "artifacts.type.toolCall",
+    mcptoolcall: "artifacts.type.toolCall",
+    websearch: "artifacts.type.webSearch",
+    collabcall: "artifacts.type.collabCall",
+    collabagenttoolcall: "artifacts.type.collabCall",
   };
-  return map[normalized] ?? normalized.replace(/[-_]+/g, " ");
+  return map[token] ?? null;
 }
 
 function normalizeArtifactLink(value: unknown): OrbitArtifactLink | null {
@@ -203,10 +207,9 @@ export function normalizeArtifact(value: unknown, fallbackThreadId?: string): Or
     toStringValue(record.title) ??
     toStringValue(record.label) ??
     toStringValue(record.name);
-  const typeLabel = humanizeArtifactType(type);
   const title =
     titleCandidate ??
-    (rawSummary && rawSummary.length <= 96 ? rawSummary : typeLabel);
+    (rawSummary && rawSummary.length <= 96 ? rawSummary : type);
   const status = toStringValue(record.status) ?? toStringValue(record.state) ?? undefined;
   const createdAt = toIsoDate(
     record.createdAt ?? record.created_at ?? record.timestamp ?? record.ts ?? record.time,
