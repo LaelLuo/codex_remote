@@ -1,8 +1,8 @@
 # FastAPI Control Plane
 
-Lightweight replacement for Orbit when you want a simpler self-hosted stack.
+当你希望使用更简单的 self-hosted 栈时，可用它作为 Orbit 的轻量替代。
 
-## What is implemented
+## 已实现内容
 
 - `GET /health`
 - `GET /auth/session`
@@ -22,14 +22,14 @@ Lightweight replacement for Orbit when you want a simpler self-hosted stack.
 - `WS /ws/client`
 - `WS /ws/anchor`
 
-Realtime behavior mirrors Orbit basics:
+实时行为与 Orbit 基础能力保持一致：
 
 - `orbit.subscribe` / `orbit.unsubscribe`
 - `orbit.list-anchors`
 - `anchor.hello`, `orbit.anchor-connected`, `orbit.anchor-disconnected`
-- thread-scoped routing from anchor to clients
+- 从 anchor 到 clients 的 thread 级路由
 
-## Run locally
+## 本地运行
 
 ```bash
 cd services/control-plane
@@ -39,7 +39,7 @@ pip install -r requirements.txt
 uvicorn app.main:app --host 0.0.0.0 --port 8080
 ```
 
-## Env vars
+## 环境变量
 
 - `AUTH_MODE=passkey` or `AUTH_MODE=basic`
 - `CODEX_REMOTE_WEB_JWT_SECRET=change-me`
@@ -53,24 +53,24 @@ uvicorn app.main:app --host 0.0.0.0 --port 8080
 - `ANCHOR_ACCESS_TTL_SEC=86400`
 - `ANCHOR_REFRESH_TTL_SEC=2592000`
 
-Passkey mode vars:
+Passkey 模式变量：
 
 - `PASSKEY_ORIGIN=https://your-frontend.vercel.app`
 - `PASSKEY_RP_ID=your-frontend.vercel.app` (optional; derived from origin if omitted)
 - `CHALLENGE_TTL_SEC=300`
 
-## Frontend setup
+## Frontend 配置
 
-Build frontend with:
+构建 frontend 时使用：
 
 - `AUTH_URL=https://<your-fastapi-domain>`
 - `AUTH_MODE=passkey` (or `basic` for quick local setup)
 
-## Anchor setup
+## Anchor 配置
 
-Point anchor to FastAPI endpoints:
+将 anchor 指向 FastAPI endpoints：
 
 - `ANCHOR_ORBIT_URL=wss://<your-fastapi-domain>/ws/anchor`
 - `AUTH_URL=https://<your-fastapi-domain>`
 
-Anchor obtains opaque device access tokens from `/auth/device/token` and refreshes via `/auth/device/refresh` (no shared JWT signing secret on the device). Legacy `anchorJwtSecret` flow is accepted for backward compatibility.
+Anchor 通过 `/auth/device/token` 获取 opaque device access token，并通过 `/auth/device/refresh` 刷新（设备端不需要共享 JWT 签名 secret）。出于向后兼容，仍接受 legacy `anchorJwtSecret` flow。

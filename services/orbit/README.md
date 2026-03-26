@@ -1,8 +1,8 @@
 # Orbit
 
-Cloudflare Worker + Durable Object service for auth + relay between Anchor and the web client.
+基于 Cloudflare Worker + Durable Object 的服务，提供 auth，并在 Anchor 与 web client 之间做 relay。
 
-## Run (local)
+## 本地运行
 
 ```bash
 cd services/orbit
@@ -10,7 +10,7 @@ bun install
 bun run dev
 ```
 
-## Endpoints
+## 端点
 
 - `GET /health`
 - `GET /auth/session`
@@ -18,25 +18,25 @@ bun run dev
 - `GET /ws/client`
 - `GET /ws/anchor`
 
-## Auth
+## 认证
 
-Orbit expects a passkey session JWT from its auth endpoints:
+Orbit 期望其 auth endpoints 签发的 passkey session JWT：
 
-- `Authorization: Bearer <jwt>` header, or
-- `?token=<jwt>` query param (for browsers)
+- `Authorization: Bearer <jwt>` header，或
+- `?token=<jwt>` query param（用于浏览器）
 
-For Anchor service-to-service auth, set `CODEX_REMOTE_ANCHOR_JWT_SECRET` and use a JWT with:
+对于 Anchor service-to-service auth，请设置 `CODEX_REMOTE_ANCHOR_JWT_SECRET`，并使用包含以下字段的 JWT：
 
 - `iss: "codex-remote-anchor"`
 - `aud: "codex-remote-orbit-anchor"`
 
-## D1 setup
+## D1 配置
 
-Setup:
+步骤：
 
-1. Create a D1 database (example name `codex-remote-orbit`).
-2. Update `wrangler.toml` with the real `database_id`.
-3. Apply migrations:
+1. 创建 D1 数据库（示例名称 `codex-remote-orbit`）。
+2. 在 `wrangler.toml` 中填入真实 `database_id`。
+3. 应用 migrations：
 
 ```bash
 bunx wrangler d1 migrations apply codex-remote-orbit --remote

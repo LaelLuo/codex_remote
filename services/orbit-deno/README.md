@@ -1,8 +1,8 @@
 # Orbit Deno
 
-Deno Deploy control-plane provider for Codex Remote.
+Codex Remote 的 Deno Deploy control-plane provider。
 
-## Endpoints
+## 端点
 
 - `GET /health`
 - `GET /auth/session`
@@ -14,12 +14,12 @@ Deno Deploy control-plane provider for Codex Remote.
 - `GET/WS /ws/client`
 - `GET/WS /ws/anchor`
 
-## Run locally
+## 本地运行
 
 ```bash
 deno run -A services/orbit-deno/main.ts
 ```
 
-## Deploy
+## 部署
 
-Use `codex-remote self-host --provider deno`.
+使用 `codex-remote self-host --provider deno`。

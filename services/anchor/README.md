@@ -1,8 +1,8 @@
 # Anchor
 
-Local bridge that runs `codex app-server` and relays JSON-RPC over WebSocket.
+在本地运行 `codex app-server` 并通过 WebSocket 转发 JSON-RPC 的桥接服务。
 
-## Run
+## 运行
 
 ```bash
 cd services/anchor
@@ -10,24 +10,24 @@ bun install
 bun run dev
 ```
 
-Requirements:
+要求：
 
-- Codex CLI installed and authenticated (`codex login`)
-- `codex app-server` available on PATH
+- 已安装并完成认证的 Codex CLI（`codex login`）
+- `codex app-server` 可在 PATH 中找到
 
-## Configuration
+## 配置
 
-Env is loaded from the repo root `.env` via the run scripts.
+运行脚本会从仓库根目录的 `.env` 加载环境变量。
 
-| Variable | Default | Description |
+| 变量 | 默认值 | 说明 |
 |----------|---------|-------------|
-| `ANCHOR_PORT` | `8788` | Local WebSocket server port |
-| `ANCHOR_ORBIT_URL` | _(empty)_ | Orbit relay URL (e.g. `wss://orbit.<domain>.workers.dev/ws/anchor`) |
-| `AUTH_URL` | _(empty)_ | Auth endpoint base URL (served by Orbit) for device code login |
-| `CODEX_REMOTE_ANCHOR_JWT_SECRET` | _(empty)_ | Shared secret for Orbit service-to-service auth |
-| `ANCHOR_JWT_TTL_SEC` | `300` | JWT token lifetime in seconds |
-| `ANCHOR_APP_CWD` | `process.cwd()` | Working directory sent to app-server during init |
-| `CODEX_REMOTE_CREDENTIALS_FILE` | `~/.codex-remote/credentials.json` | Path to stored login credentials |
+| `ANCHOR_PORT` | `8788` | 本地 WebSocket 服务端口 |
+| `ANCHOR_ORBIT_URL` | _(empty)_ | Orbit relay URL（例如 `wss://orbit.<domain>.workers.dev/ws/anchor`） |
+| `AUTH_URL` | _(empty)_ | device code 登录使用的 Auth endpoint base URL（由 Orbit 提供） |
+| `CODEX_REMOTE_ANCHOR_JWT_SECRET` | _(empty)_ | Orbit service-to-service auth 的共享 secret |
+| `ANCHOR_JWT_TTL_SEC` | `300` | JWT token 生命周期（秒） |
+| `ANCHOR_APP_CWD` | `process.cwd()` | 初始化时发送给 app-server 的工作目录 |
+| `CODEX_REMOTE_CREDENTIALS_FILE` | `~/.codex-remote/credentials.json` | 已保存登录凭据的路径 |
 
 ## WebSocket endpoint
 

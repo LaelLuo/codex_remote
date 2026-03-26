@@ -30,3 +30,4 @@
 - 2026-03-26T14:07:27+08:00 [agent] 本轮清理 Landing 静态标签：将 feature-label（Anchor/Orbit/Handheld）接入 i18n key；品牌词 Anchor/Orbit 保持英文，Handheld 在中文下显示“手持端”；补充 i18n 断言并通过 lint。
 - 2026-03-26T14:16:51+08:00 [agent] 本轮清理 WorktreeModal 静态占位符：将 `searchStart/rootDir/exactPath` 三处路径示例 placeholder 接入 i18n key，中文下改为“例如：…”样式并保留跨平台路径示例；补充 i18n 断言并通过 lint。
 - 2026-03-26T14:39:32+08:00 [agent] 文档中文化第一批完成：将 `README.md`、`docs/README.md`、`docs/installation.md`、`docs/auth.md` 面向用户/部署者正文翻译为中文，保留命令/路径/URL/环境变量与品牌词原样；完成最小格式检查与 lint 验证。
+- 2026-03-26T14:53:10+08:00 [agent] 文档中文化第二批完成：将 `docs/self-hosting.md` 与 `services/anchor|orbit|orbit-deno|control-plane/README.md` 的部署/运维说明翻译为中文，保留命令、API 路径、环境变量、协议名和品牌词原样；完成 diff 格式检查与 lint。

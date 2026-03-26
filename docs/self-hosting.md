@@ -1,92 +1,92 @@
 # Self-hosting
 
-Codex Remote можно полностью развернуть в своём аккаунте с провайдером `cloudflare` или `deno`.
+Codex Remote 可以在你自己的账号中完整部署，provider 支持 `cloudflare` 或 `deno`。
 
-Команда `codex-remote self-host` запускает единый мастер деплоя для обоих вариантов.
+命令 `codex-remote self-host` 会启动统一的部署向导，适用于这两种方案。
 
-## Требования
+## 前置要求
 
 - macOS/Linux/Windows
-- установленный [Bun](https://bun.sh)
-- установленный [Codex CLI](https://github.com/openai/codex)
-- установленный Codex Remote (см. [installation.md](installation.md))
-- аккаунт провайдера:
-  - Cloudflare (подходит free tier)
-  - Deno Deploy (подходит free tier)
+- 已安装 [Bun](https://bun.sh)
+- 已安装 [Codex CLI](https://github.com/openai/codex)
+- 已安装 Codex Remote（见 [installation.md](installation.md)）
+- provider 账号：
+  - Cloudflare（free tier 可用）
+  - Deno Deploy（free tier 可用）
 
-Провайдерные инструменты:
+Provider 工具：
 
 - `cloudflare`: `wrangler`
-- `deno`: `deployctl` (глобально или через `deno run -A jsr:@deno/deployctl`)
+- `deno`: `deployctl`（全局安装，或通过 `deno run -A jsr:@deno/deployctl`）
 
-Для Deno нужен `DENO_DEPLOY_TOKEN`.
+Deno 需要 `DENO_DEPLOY_TOKEN`。
 
-## Что деплоится
+## 部署内容
 
-| Сервис | Платформа | Назначение |
+| 服务 | 平台 | 用途 |
 |---|---|---|
-| Orbit / Control Plane | Cloudflare Worker + DO или Deno Deploy runtime | auth, выпуск токенов, websocket relay между web и Anchor |
-| Web | Cloudflare Pages или Deno Deploy static | статический Svelte frontend |
+| Orbit / Control Plane | Cloudflare Worker + DO 或 Deno Deploy runtime | auth、token 签发、web 与 Anchor 之间的 websocket relay |
+| Web | Cloudflare Pages 或 Deno Deploy static | 静态 Svelte frontend |
 
-Хранилище состояния:
+状态存储：
 
 - `cloudflare`: D1
 - `deno`: Deno KV
 
-JWT/служебные секреты генерируются мастером и автоматически прокидываются в окружение деплоя.
+JWT/系统 secrets 由向导生成，并自动注入部署环境。
 
-## Запуск мастера
+## 启动向导
 
 ```bash
 codex-remote self-host --provider cloudflare
-# или:
+# 或：
 codex-remote self-host --provider deno
-# принудительно выполнить login после настройки:
+# 在配置完成后强制执行 login：
 codex-remote self-host --provider deno --login
 ```
 
-Мастер можно запустить:
+向导可在以下时机运行：
 
-1. во время `install.sh` / `install.ps1`, или
-2. позже вручную из терминала.
+1. 在 `install.sh` / `install.ps1` 执行期间，或
+2. 之后在终端手动执行。
 
-## Что делает мастер
+## 向导执行内容
 
-1. Проверяет проект и локальные зависимости
-2. Проверяет инструменты провайдера (`wrangler`/`deployctl`)
-3. Для Deno проверяет `DENO_DEPLOY_TOKEN`
-4. Генерирует JWT/VAPID секреты
-5. Деплоит backend (Orbit/control-plane)
-6. Собирает frontend с корректным `AUTH_URL`
-7. Деплоит статический web
-8. Записывает значения в `.env` для Anchor
+1. 检查项目与本地依赖
+2. 检查 provider 工具（`wrangler`/`deployctl`）
+3. 对 Deno 检查 `DENO_DEPLOY_TOKEN`
+4. 生成 JWT/VAPID secrets
+5. 部署 backend（Orbit/control-plane）
+6. 使用正确的 `AUTH_URL` 构建 frontend
+7. 部署静态 web
+8. 将配置写入 Anchor 使用的 `.env`
 
-В конце печатает URL и следующие шаги.
+最后会输出 URL 与后续步骤。
 
-По умолчанию после деплоя спрашивает, запускать ли `codex-remote login`. Поведение можно зафиксировать флагами `--login`/`--no-login`.
+默认在部署后会询问是否执行 `codex-remote login`。可用 `--login`/`--no-login` 固定行为。
 
-## Поведение при ошибках
+## 出错行为
 
-`codex-remote self-host` завершится с non-zero кодом, если критический этап не прошёл.
+若关键阶段失败，`codex-remote self-host` 会以 non-zero 退出码结束。
 
-После исправления причины ошибку можно безопасно повторно прогнать ту же команду.
+修复原因后，可以安全地重新执行同一命令。
 
-## После деплоя
+## 部署后步骤
 
-1. Откройте URL приложения (из вывода мастера) и создайте/войдите в аккаунт
-2. Запустите `codex-remote start` для подключения локального Anchor
+1. 打开向导输出中的应用 URL，并注册/登录账号
+2. 执行 `codex-remote start` 连接本地 Anchor
 
-## Обновление self-host окружения
+## 更新 self-host 环境
 
 ```bash
 codex-remote update
 ```
 
-Команда пере-деплоит web + backend для провайдера из `SELF_HOST_PROVIDER`.
+该命令会按 `SELF_HOST_PROVIDER` 为当前 provider 重新部署 web + backend。
 
-Если update не прошёл, исправьте окружение (например, auth у провайдера) и повторите.
+如果 update 失败，请修复环境问题（例如 provider 认证）后重试。
 
-Пример ручного redeploy для Cloudflare:
+Cloudflare 手动 redeploy 示例：
 
 ```bash
 # redeploy orbit
@@ -96,6 +96,6 @@ codex-remote update
 (cd ~/.codex-remote && bun run build && wrangler pages deploy dist --project-name codex-remote)
 ```
 
-## Архитектура
+## 架构
 
-Подробности взаимодействия компонентов: [architecture.md](architecture.md).
+组件交互细节见：[architecture.md](architecture.md)。
