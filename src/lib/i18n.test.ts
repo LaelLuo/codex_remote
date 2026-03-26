@@ -166,6 +166,9 @@ describe("i18n store", () => {
     expect(i18n.t("projectPicker.noSubdirectories")).toBe("No subdirectories");
     expect(i18n.t("worktreeModal.searchStartDirectory")).toBe("Search start directory");
     expect(i18n.t("worktreeModal.gitRepositoryDetected")).toBe("Git repository detected");
+    expect(i18n.t("worktreeModal.placeholder.searchStart")).toBe("C:\\Projects or /Users/name/projects");
+    expect(i18n.t("worktreeModal.placeholder.rootDir")).toBe("D:\\codex-worktrees or /Volumes/worktrees");
+    expect(i18n.t("worktreeModal.placeholder.exactPath")).toBe("D:\\codex-worktrees\\repo\\branch-name");
     expect(i18n.t("worktrees.error.inspectFailed")).toBe("Failed to inspect git repository");
     expect(i18n.t("worktrees.error.createFailed")).toBe("Failed to create worktree");
 
@@ -174,6 +177,9 @@ describe("i18n store", () => {
     expect(i18n.t("projectPicker.noSubdirectories")).toBe("没有子目录");
     expect(i18n.t("worktreeModal.searchStartDirectory")).toBe("搜索起始目录");
     expect(i18n.t("worktreeModal.gitRepositoryDetected")).toBe("检测到 Git 仓库");
+    expect(i18n.t("worktreeModal.placeholder.searchStart")).toBe("例如：C:\\Projects 或 /Users/name/projects");
+    expect(i18n.t("worktreeModal.placeholder.rootDir")).toBe("例如：D:\\codex-worktrees 或 /Volumes/worktrees");
+    expect(i18n.t("worktreeModal.placeholder.exactPath")).toBe("例如：D:\\codex-worktrees\\repo\\branch-name");
     expect(i18n.t("worktrees.error.inspectFailed")).toBe("检查 Git 仓库失败");
     expect(i18n.t("worktrees.error.createFailed")).toBe("创建工作树失败");
   });

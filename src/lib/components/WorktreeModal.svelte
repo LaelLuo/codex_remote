@@ -262,7 +262,7 @@
               class="path-input"
               type="text"
               bind:value={searchStartPath}
-              placeholder="C:\\Projects or /Users/name/projects"
+              placeholder={i18n.t("worktreeModal.placeholder.searchStart")}
             />
             <button type="button" class="tiny-btn" onclick={openSearchStart}>{i18n.t("worktreeModal.open")}</button>
             <button type="button" class="tiny-btn" onclick={setSearchStartFromCurrent}>{i18n.t("worktreeModal.useCurrent")}</button>
@@ -323,7 +323,7 @@
                 class="path-input"
                 type="text"
                 bind:value={worktreeRootDir}
-                placeholder="D:\\codex-worktrees or /Volumes/worktrees"
+                placeholder={i18n.t("worktreeModal.placeholder.rootDir")}
               />
               <button type="button" class="tiny-btn" onclick={setWorktreeRootFromCurrent}>{i18n.t("worktreeModal.useCurrent")}</button>
             </div>
@@ -333,7 +333,7 @@
               class="path-input"
               type="text"
               bind:value={newWorktreePath}
-              placeholder="D:\\codex-worktrees\\repo\\branch-name"
+              placeholder={i18n.t("worktreeModal.placeholder.exactPath")}
             />
           </div>
 

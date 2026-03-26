@@ -28,3 +28,4 @@
 - 2026-03-26T13:30:30+08:00 [agent] 本轮完成 ReleaseCockpit 状态标签本地化：新增 `releaseCheckStatusKey` / `releaseLifecycleLabelKey` 映射并在 `ReleaseCockpit.svelte` 渲染层翻译 `check.status`、`status.status`、`status.phase`，避免中文界面展示 pass/running/completed 等英文；补充 i18n 与 release-cockpit 测试并通过 lint。
 - 2026-03-26T13:51:30+08:00 [agent] 本轮补齐剩余状态标签：`releaseLogLevelKey` 映射并在 `ReleaseCockpit.svelte` 本地化 `log.level`；`artifactStatusKey` 映射并在 `ArtifactsTimeline.svelte` 本地化 `artifact.status`；新增对应 i18n 词条与 artifacts/release-cockpit/i18n 测试断言，验证通过。
 - 2026-03-26T14:07:27+08:00 [agent] 本轮清理 Landing 静态标签：将 feature-label（Anchor/Orbit/Handheld）接入 i18n key；品牌词 Anchor/Orbit 保持英文，Handheld 在中文下显示“手持端”；补充 i18n 断言并通过 lint。
+- 2026-03-26T14:16:51+08:00 [agent] 本轮清理 WorktreeModal 静态占位符：将 `searchStart/rootDir/exactPath` 三处路径示例 placeholder 接入 i18n key，中文下改为“例如：…”样式并保留跨平台路径示例；补充 i18n 断言并通过 lint。
