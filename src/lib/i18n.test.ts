@@ -321,4 +321,16 @@ describe("i18n store", () => {
     expect(i18n.t("artifacts.status.failed")).toBe("失败");
     expect(i18n.t("artifacts.status.blocked")).toBe("已阻塞");
   });
+
+  test("translates landing feature labels with brand-preserving strategy", async () => {
+    const { i18n } = await loadI18n();
+    expect(i18n.t("landing.featureLabel.anchor")).toBe("Anchor");
+    expect(i18n.t("landing.featureLabel.orbit")).toBe("Orbit");
+    expect(i18n.t("landing.featureLabel.handheld")).toBe("Handheld");
+
+    i18n.set("zh-CN");
+    expect(i18n.t("landing.featureLabel.anchor")).toBe("Anchor");
+    expect(i18n.t("landing.featureLabel.orbit")).toBe("Orbit");
+    expect(i18n.t("landing.featureLabel.handheld")).toBe("手持端");
+  });
 });

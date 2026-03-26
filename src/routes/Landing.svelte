@@ -80,17 +80,17 @@
     <section class="features">
       <div class="feature">
         <span class="feature-index">01</span>
-        <span class="feature-label">Anchor</span>
+        <span class="feature-label">{i18n.t("landing.featureLabel.anchor")}</span>
         <p>{i18n.t("landing.feature.anchor")}</p>
       </div>
       <div class="feature">
         <span class="feature-index">02</span>
-        <span class="feature-label">Orbit</span>
+        <span class="feature-label">{i18n.t("landing.featureLabel.orbit")}</span>
         <p>{i18n.t("landing.feature.orbit")}</p>
       </div>
       <div class="feature">
         <span class="feature-index">03</span>
-        <span class="feature-label">Handheld</span>
+        <span class="feature-label">{i18n.t("landing.featureLabel.handheld")}</span>
         <p>{i18n.t("landing.feature.handheld")}</p>
       </div>
     </section>
