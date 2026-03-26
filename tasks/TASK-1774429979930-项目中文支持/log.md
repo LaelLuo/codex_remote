@@ -31,3 +31,4 @@
 - 2026-03-26T14:16:51+08:00 [agent] 本轮清理 WorktreeModal 静态占位符：将 `searchStart/rootDir/exactPath` 三处路径示例 placeholder 接入 i18n key，中文下改为“例如：…”样式并保留跨平台路径示例；补充 i18n 断言并通过 lint。
 - 2026-03-26T14:39:32+08:00 [agent] 文档中文化第一批完成：将 `README.md`、`docs/README.md`、`docs/installation.md`、`docs/auth.md` 面向用户/部署者正文翻译为中文，保留命令/路径/URL/环境变量与品牌词原样；完成最小格式检查与 lint 验证。
 - 2026-03-26T14:53:10+08:00 [agent] 文档中文化第二批完成：将 `docs/self-hosting.md` 与 `services/anchor|orbit|orbit-deno|control-plane/README.md` 的部署/运维说明翻译为中文，保留命令、API 路径、环境变量、协议名和品牌词原样；完成 diff 格式检查与 lint。
+- 2026-03-26T15:03:27+08:00 [agent] 文档中文化第三批完成：将 `docs/architecture.md`、`docs/repo-structure.md`、`docs/security.md`、`docs/events.md`、`docs/fastapi-control-plane.md`、`docs/vision.md` 的架构与参考说明翻译为中文，保持事件名/API 路径/字段与流程结构原样；完成 diff 格式检查与 lint。

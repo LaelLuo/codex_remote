@@ -1,28 +1,28 @@
-# Справочник событий
+# 事件参考
 
-Документ описывает JSON-RPC методы и служебные Orbit-сообщения, которыми обмениваются web client, Orbit и Anchor.
+本文档描述 web client、Orbit 与 Anchor 之间交换的 JSON-RPC 方法与 Orbit 系统消息。
 
-Формат на проводе: JSON-RPC 2.0-подобные сообщения поверх WebSocket.
+线上传输格式：基于 WebSocket 的类 JSON-RPC 2.0 消息。
 
-## Клиент -> сервер
+## 客户端 -> 服务器
 
-### Управление тредами
+### 线程管理
 
-| Метод | Параметры | Примечание |
+| 方法 | 参数 | 说明 |
 |---|---|---|
-| `thread/start` | `{ cwd, approvalPolicy?, sandbox? }` | Создать новый тред |
-| `thread/list` | `{ cursor, limit }` | Постраничный список |
-| `thread/resume` | `{ threadId }` | Восстановить тред вместе с историей |
-| `thread/archive` | `{ threadId }` | Мягкое архивирование |
+| `thread/start` | `{ cwd, approvalPolicy?, sandbox? }` | 创建新线程 |
+| `thread/list` | `{ cursor, limit }` | 分页列表 |
+| `thread/resume` | `{ threadId }` | 恢复线程及其历史 |
+| `thread/archive` | `{ threadId }` | 软归档 |
 
-### Управление ходом (`turn`)
+### 回合管理（`turn`）
 
-| Метод | Параметры | Примечание |
+| 方法 | 参数 | 说明 |
 |---|---|---|
-| `turn/start` | `{ threadId, input, collaborationMode?, model?, effort?, sandboxPolicy? }` | Запустить ход. `input` поддерживает текст и изображения |
-| `turn/interrupt` | `{ threadId, turnId }` | Прервать текущий ход |
+| `turn/start` | `{ threadId, input, collaborationMode?, model?, effort?, sandboxPolicy? }` | 启动回合。`input` 支持文本与图片 |
+| `turn/interrupt` | `{ threadId, turnId }` | 中断当前回合 |
 
-`input` пример:
+`input` 示例：
 
 ```json
 [
@@ -33,11 +33,11 @@
 
 ### Collaboration mode
 
-| Метод | Параметры | Примечание |
+| 方法 | 参数 | 说明 |
 |---|---|---|
-| `collaborationMode/list` | `{}` | Вернуть доступные режимы |
+| `collaborationMode/list` | `{}` | 返回可用模式 |
 
-Пример передачи `collaborationMode` в `turn/start`:
+在 `turn/start` 里传入 `collaborationMode` 的示例：
 
 ```json
 {
@@ -52,29 +52,29 @@
 }
 ```
 
-Поддерживаемые режимы: `"plan"`, `"code"`.
+支持模式：`"plan"`、`"code"`。
 
-### Ответы на запросы подтверждения
+### 审批请求响应
 
-JSON-RPC response на конкретный `id`:
+针对具体 `id` 的 JSON-RPC response：
 
 ```json
 { "id": 123, "result": { "decision": "accept" } }
 ```
 
-Варианты `decision`: `accept`, `acceptForSession`, `decline`, `cancel`.
+`decision` 可选值：`accept`、`acceptForSession`、`decline`、`cancel`。
 
-### Ответы на запросы пользовательского ввода
+### 用户输入请求响应
 
 ```json
 { "id": 123, "result": { "answers": { "questionId": { "answers": ["..."] } } } }
 ```
 
-## Anchor local helper-методы (`anchor.*`)
+## Anchor 本地 helper 方法（`anchor.*`）
 
-Эти методы обрабатываются Anchor локально и не проксируются в `codex app-server`.
+这些方法由 Anchor 在本地处理，不会代理到 `codex app-server`。
 
-| Метод | Параметры | Результат |
+| 方法 | 参数 | 结果 |
 |---|---|---|
 | `anchor.listDirs` | `{ path?, startPath? }` | `{ dirs, parent, current, roots }` |
 | `anchor.git.inspect` | `{ path }` | `{ isGitRepo, repoRoot?, currentBranch? }` |
@@ -88,77 +88,77 @@ JSON-RPC response на конкретный `id`:
 | `anchor.git.commit` | `{ repoRoot, message, stageAll?, paths? }` | `{ committed, output }` |
 | `anchor.git.push` | `{ repoRoot, remote?, branch? }` | `{ pushed, output }` |
 | `anchor.git.revert` | `{ repoRoot, paths? }` | `{ reverted, output }` |
-| `anchor.release.inspect` | `{ ... }` | release-статус по локальному релиз-процессу |
-| `anchor.release.start` | `{ ... }` | запуск локального релиз-процесса |
-| `anchor.release.status` | `{ ... }` | прогресс релиза |
+| `anchor.release.inspect` | `{ ... }` | 本地 release 过程状态 |
+| `anchor.release.start` | `{ ... }` | 启动本地 release 过程 |
+| `anchor.release.status` | `{ ... }` | release 进度 |
 | `anchor.config.read` | `{ path?, anchorId? }` | `{ path, exists, content, candidates, platform }` |
 | `anchor.config.write` | `{ content, path?, anchorId? }` | `{ saved, path, bytes }` |
 | `anchor.image.read` | `{ path, anchorId? }` | `{ path, mimeType, dataBase64, bytes }` |
 | `anchor.file.read` | `{ path, anchorId? }` | `{ path, content, bytes, truncated }` |
 
-## Orbit control-сообщения (не JSON-RPC)
+## Orbit control 消息（非 JSON-RPC）
 
-| Тип | Формат | Назначение |
+| 类型 | 格式 | 用途 |
 |---|---|---|
-| `orbit.subscribe` | `{ type, threadId }` | Подписка на события треда |
-| `orbit.unsubscribe` | `{ type, threadId }` | Отписка от треда |
-| `orbit.list-anchors` | `{ type }` | Запрос списка подключённых Anchor |
-| `orbit.anchors` | `{ type, anchors }` | Ответ со списком устройств |
-| `orbit.anchor-connected` | `{ type, anchor }` | Уведомление о новом Anchor |
-| `orbit.anchor-disconnected` | `{ type, anchorId }` | Уведомление об отключении Anchor |
-| `orbit.hello` | `{ type, ... }` | Приветственное сообщение при подключении |
+| `orbit.subscribe` | `{ type, threadId }` | 订阅线程事件 |
+| `orbit.unsubscribe` | `{ type, threadId }` | 取消订阅线程 |
+| `orbit.list-anchors` | `{ type }` | 请求已连接 Anchor 列表 |
+| `orbit.anchors` | `{ type, anchors }` | 返回设备列表 |
+| `orbit.anchor-connected` | `{ type, anchor }` | 新 Anchor 连接通知 |
+| `orbit.anchor-disconnected` | `{ type, anchorId }` | Anchor 断开通知 |
+| `orbit.hello` | `{ type, ... }` | 建连欢迎消息 |
 | `ping` / `pong` | `{ type }` | Keepalive |
 
-## Сервер -> клиент
+## 服务器 -> 客户端
 
-### Жизненный цикл треда
+### 线程生命周期
 
-| Метод | Параметры | Примечание |
+| 方法 | 参数 | 说明 |
 |---|---|---|
-| `thread/started` | `{ thread: ThreadInfo }` | Нотификация после `thread/start` |
-| `thread/list` (response) | `{ data: ThreadInfo[] }` | Ответ RPC |
-| `thread/resume` (response) | `{ thread: { id, turns: [{ items }] } }` | Полная история треда |
+| `thread/started` | `{ thread: ThreadInfo }` | `thread/start` 后通知 |
+| `thread/list` (response) | `{ data: ThreadInfo[] }` | RPC 响应 |
+| `thread/resume` (response) | `{ thread: { id, turns: [{ items }] } }` | 完整线程历史 |
 
-### Жизненный цикл хода
+### 回合生命周期
 
-| Метод | Параметры | Примечание |
+| 方法 | 参数 | 说明 |
 |---|---|---|
-| `turn/started` | `{ turn: { id, status } }` | Инициализация UI состояния |
-| `turn/completed` | `{ turn: { id, status } }` | Статус: `Completed`, `Interrupted`, `Failed` |
-| `turn/plan/updated` | `{ turnId, explanation?, plan[] }` | Прогресс плана (`Pending/InProgress/Completed`) |
-| `turn/diff/updated` | `{ threadId, turnId, diff }` | Накопительный diff workspace |
+| `turn/started` | `{ turn: { id, status } }` | 初始化 UI 状态 |
+| `turn/completed` | `{ turn: { id, status } }` | 状态：`Completed`、`Interrupted`、`Failed` |
+| `turn/plan/updated` | `{ turnId, explanation?, plan[] }` | 计划进度（`Pending/InProgress/Completed`） |
+| `turn/diff/updated` | `{ threadId, turnId, diff }` | workspace 累积 diff |
 
-### Потоковые item-уведомления
+### 流式 item 通知
 
-| Метод | Параметры | Примечание |
+| 方法 | 参数 | 说明 |
 |---|---|---|
-| `item/started` | `{ item }` | Старт item |
-| `item/agentMessage/delta` | `{ threadId, itemId, delta }` | Поток текста ответа ассистента |
-| `item/reasoning/summaryTextDelta` | `{ threadId, delta }` | Поток краткого reasoning |
-| `item/reasoning/textDelta` | `{ threadId, delta }` | Поток полного reasoning |
-| `item/reasoning/summaryPartAdded` | `{ threadId }` | Разделение reasoning-блоков |
-| `item/commandExecution/outputDelta` | `{ threadId, itemId, delta }` | stdout/stderr команды |
-| `item/fileChange/outputDelta` | `{ threadId, itemId, delta }` | Поток file diff |
-| `item/commandExecution/terminalInteraction` | `{ threadId, itemId, processId?, stdin }` | Интерактивный ввод в процесс |
-| `item/mcpToolCall/progress` | `{ threadId, itemId, message }` | Прогресс MCP-вызова |
-| `item/plan/delta` | `{ threadId, itemId, delta }` | Поток текста плана |
-| `item/completed` | `{ item }` | Финальное состояние item |
+| `item/started` | `{ item }` | item 开始 |
+| `item/agentMessage/delta` | `{ threadId, itemId, delta }` | assistant 回复文本流 |
+| `item/reasoning/summaryTextDelta` | `{ threadId, delta }` | reasoning 摘要流 |
+| `item/reasoning/textDelta` | `{ threadId, delta }` | reasoning 全量流 |
+| `item/reasoning/summaryPartAdded` | `{ threadId }` | reasoning 分段 |
+| `item/commandExecution/outputDelta` | `{ threadId, itemId, delta }` | 命令 stdout/stderr |
+| `item/fileChange/outputDelta` | `{ threadId, itemId, delta }` | file diff 流 |
+| `item/commandExecution/terminalInteraction` | `{ threadId, itemId, processId?, stdin }` | 进程交互输入 |
+| `item/mcpToolCall/progress` | `{ threadId, itemId, message }` | MCP 调用进度 |
+| `item/plan/delta` | `{ threadId, itemId, delta }` | 计划文本流 |
+| `item/completed` | `{ item }` | item 最终状态 |
 
-### Запросы подтверждения от сервера
+### 来自服务器的审批请求
 
-| Метод | Параметры |
+| 方法 | 参数 |
 |---|---|
 | `item/commandExecution/requestApproval` | `{ threadId, itemId, reason? }` |
 | `item/fileChange/requestApproval` | `{ threadId, itemId, reason? }` |
 | `item/mcpToolCall/requestApproval` | `{ threadId, itemId, reason? }` |
 
-### Запросы пользовательского ввода от сервера
+### 来自服务器的用户输入请求
 
-| Метод | Параметры |
+| 方法 | 参数 |
 |---|---|
 | `item/tool/requestUserInput` | `{ threadId, itemId, questions[] }` |
 
-Формат вопроса:
+问题格式：
 
 ```json
 {
@@ -171,7 +171,7 @@ JSON-RPC response на конкретный `id`:
 }
 ```
 
-## Типы `item` в `item/completed`
+## `item/completed` 中的 `item` 类型
 
 | Type | Payload | MessageKind |
 |---|---|---|
@@ -189,11 +189,11 @@ JSON-RPC response на конкретный `id`:
 | `collabAgentToolCall` | `{ tool, status, receiverThreadIds, prompt }` | `collab` |
 | `contextCompaction` | `{}` | `compaction` |
 
-## Примечания по рендерингу клиента
+## 客户端渲染说明
 
-- reasoning-дельты буферизуются и показываются как единый свернутый блок
-- пустой `stdin` в `terminalInteraction` трактуется как состояние ожидания
-- из `agentMessage` удаляются теги `<proposed_plan>`
-- plan-item рендерится отдельной карточкой с подтверждением
-- `contextCompaction` выводится как нейтральный разделитель
-- режим `collaborationMode` синхронизируется с состоянием утверждения плана
+- reasoning deltas 会缓冲后以单个可折叠块展示
+- `terminalInteraction` 中空 `stdin` 视为等待状态
+- 会从 `agentMessage` 中移除 `<proposed_plan>` 标签
+- plan-item 渲染为单独卡片并带确认流程
+- `contextCompaction` 显示为中性分隔信息
+- `collaborationMode` 与计划确认状态同步

@@ -1,52 +1,52 @@
-# Структура репозитория
+# 仓库结构
 
 ```text
 .
 ├── bin/
 │   ├── codex-remote                          # CLI entry point
-│   ├── self-host.sh                          # self-host мастер для Cloudflare
-│   └── self-host-deno.sh                     # self-host мастер для Deno Deploy
-├── docs/                                     # Проектная документация
-├── migrations/                               # Миграции БД (D1/совместимые схемы)
+│   ├── self-host.sh                          # Cloudflare 的 self-host 向导
+│   └── self-host-deno.sh                     # Deno Deploy 的 self-host 向导
+├── docs/                                     # 项目文档
+├── migrations/                               # 数据库迁移（D1/兼容 schema）
 ├── public/
-│   ├── icons/                                # Иконки PWA
+│   ├── icons/                                # PWA 图标
 │   ├── manifest.json                         # PWA manifest
 │   └── sw.js                                 # Service worker
 ├── services/
-│   ├── anchor/                               # Локальный Bun bridge + relay к app-server
+│   ├── anchor/                               # 本地 Bun bridge + relay 到 app-server
 │   │   ├── src/
 │   │   └── package.json
-│   ├── orbit/                                # Cloudflare Worker + Durable Object (relay + auth)
+│   ├── orbit/                                # Cloudflare Worker + Durable Object（relay + auth）
 │   │   ├── src/
 │   │   └── wrangler.toml
-│   ├── orbit-deno/                           # Deno Deploy runtime (relay + auth)
+│   ├── orbit-deno/                           # Deno Deploy runtime（relay + auth）
 │   │   └── main.ts
-│   └── control-plane/                        # FastAPI control plane (альтернативный backend)
+│   └── control-plane/                        # FastAPI control plane（替代 backend）
 │       ├── app/
 │       ├── tests/
 │       └── requirements.txt
-├── src/                                      # Web client (Svelte)
+├── src/                                      # Web client（Svelte）
 │   ├── lib/
 │   │   ├── components/
 │   │   └── styles/
 │   ├── routes/
 │   └── global.css
 ├── .env.example
-├── install.sh                                # Установщик для macOS/Linux
-├── install.ps1                               # Установщик для Windows
+├── install.sh                                # macOS/Linux 安装脚本
+├── install.ps1                               # Windows 安装脚本
 ├── package.json
 ├── tsconfig.json
 ├── vite.config.ts
 ├── svelte.config.js
-└── wrangler.toml                             # Конфиг деплоя web client (Cloudflare Pages)
+└── wrangler.toml                             # web client 部署配置（Cloudflare Pages）
 ```
 
-## Примечания
+## 说明
 
-- Верхнеуровневый `src/` - это web client (Svelte + Vite).
-- Frontend статический и может быть задеплоен на Cloudflare Pages, Deno Deploy, Vercel и другие static host.
-- Control plane реализован в трёх вариантах: Cloudflare (`services/orbit`), Deno (`services/orbit-deno`) и FastAPI (`services/control-plane`).
-- Anchor (`services/anchor`) запускается локально и общается с `codex app-server` через stdio.
-- `bin/codex-remote` - основной CLI для локального использования.
-- `bin/self-host*.sh` - провайдер-специфичные мастера, вызываемые командой `codex-remote self-host --provider ...`.
-- `install.sh`/`install.ps1` отвечают за bootstrap, зависимости и настройку PATH.
+- 顶层 `src/` 是 web client（Svelte + Vite）。
+- Frontend 为静态站点，可部署到 Cloudflare Pages、Deno Deploy、Vercel 或其他 static host。
+- Control plane 有三种实现：Cloudflare（`services/orbit`）、Deno（`services/orbit-deno`）和 FastAPI（`services/control-plane`）。
+- Anchor（`services/anchor`）在本地运行，并通过 stdio 与 `codex app-server` 通信。
+- `bin/codex-remote` 是本地使用的主 CLI。
+- `bin/self-host*.sh` 是 provider 特定向导，由 `codex-remote self-host --provider ...` 调用。
+- `install.sh`/`install.ps1` 负责 bootstrap、依赖安装与 PATH 配置。
