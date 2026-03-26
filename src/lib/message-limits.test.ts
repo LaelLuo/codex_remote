@@ -19,7 +19,7 @@ describe("message limits", () => {
   });
 
   test("appendDeltaWithCap handles snapshot chunks without duplication", () => {
-    expect(appendDeltaWithCap("Го", "Готово")).toBe("Готово");
+    expect(appendDeltaWithCap("测", "测试中")).toBe("测试中");
     expect(appendDeltaWithCap("abc", "abc")).toBe("abc");
   });
 

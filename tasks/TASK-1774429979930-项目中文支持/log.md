@@ -32,3 +32,4 @@
 - 2026-03-26T14:39:32+08:00 [agent] 文档中文化第一批完成：将 `README.md`、`docs/README.md`、`docs/installation.md`、`docs/auth.md` 面向用户/部署者正文翻译为中文，保留命令/路径/URL/环境变量与品牌词原样；完成最小格式检查与 lint 验证。
 - 2026-03-26T14:53:10+08:00 [agent] 文档中文化第二批完成：将 `docs/self-hosting.md` 与 `services/anchor|orbit|orbit-deno|control-plane/README.md` 的部署/运维说明翻译为中文，保留命令、API 路径、环境变量、协议名和品牌词原样；完成 diff 格式检查与 lint。
 - 2026-03-26T15:03:27+08:00 [agent] 文档中文化第三批完成：将 `docs/architecture.md`、`docs/repo-structure.md`、`docs/security.md`、`docs/events.md`、`docs/fastapi-control-plane.md`、`docs/vision.md` 的架构与参考说明翻译为中文，保持事件名/API 路径/字段与流程结构原样；完成 diff 格式检查与 lint。
+- 2026-03-26T15:10:15+08:00 [agent] 最后一轮收尾：将 `src/lib/message-limits.test.ts` 中剩余俄文 Unicode 样例替换为中文等价样例（保留多字节与快照覆盖语义），并完成定向测试与俄文残留扫描。
