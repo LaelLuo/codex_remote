@@ -1,7 +1,30 @@
 import type { GitWorktree } from "./types";
-import { socket } from "./socket.svelte";
+import { getSocketErrorMessage, socket, type SocketErrorMessage } from "./socket.svelte";
 
 const STORE_KEY = "__codex_remote_worktrees_store__";
+
+export type WorktreesUiMessage = SocketErrorMessage;
+
+export function toWorktreesUiMessage(error: unknown, fallbackKey: string): WorktreesUiMessage {
+  const socketMessage = getSocketErrorMessage(error);
+  if (socketMessage) return socketMessage;
+  if (error instanceof Error && error.message.trim()) {
+    return { kind: "text", text: error.message };
+  }
+  if (typeof error === "string" && error.trim()) {
+    return { kind: "text", text: error };
+  }
+  return { kind: "key", key: fallbackKey };
+}
+
+export function renderWorktreesUiMessage(
+  message: WorktreesUiMessage | null,
+  translate: (key: string, params?: Record<string, string | number>) => string,
+): string {
+  if (!message) return "";
+  if (message.kind === "text") return message.text;
+  return translate(message.key, message.params);
+}
 
 class WorktreesStore {
   projectPath = $state("");
@@ -11,7 +34,7 @@ class WorktreesStore {
   currentBranch = $state<string | null>(null);
   loading = $state(false);
   mutating = $state(false);
-  error = $state<string | null>(null);
+  error = $state<WorktreesUiMessage | null>(null);
   #inspectRequestId = 0;
 
   get isGitRepo() {
@@ -53,7 +76,7 @@ class WorktreesStore {
       this.currentBranch = currentBranch;
     } catch (err) {
       if (requestId !== this.#inspectRequestId) return;
-      this.error = err instanceof Error ? err.message : "Failed to inspect git repository";
+      this.error = toWorktreesUiMessage(err, "worktrees.error.inspectFailed");
       this.repoRoot = null;
       this.worktrees = [];
       this.selectedWorktreePath = normalized;
@@ -71,7 +94,7 @@ class WorktreesStore {
     try {
       await this.#loadWorktrees(this.repoRoot, this.selectedWorktreePath || this.projectPath);
     } catch (err) {
-      this.error = err instanceof Error ? err.message : "Failed to refresh worktrees";
+      this.error = toWorktreesUiMessage(err, "worktrees.error.refreshFailed");
     } finally {
       this.loading = false;
     }
@@ -102,7 +125,7 @@ class WorktreesStore {
       this.selectedWorktreePath = created.path;
       this.projectPath = created.path;
     } catch (err) {
-      this.error = err instanceof Error ? err.message : "Failed to create worktree";
+      this.error = toWorktreesUiMessage(err, "worktrees.error.createFailed");
       throw err;
     } finally {
       this.mutating = false;
@@ -124,7 +147,7 @@ class WorktreesStore {
         this.projectPath = nextPath;
       }
     } catch (err) {
-      this.error = err instanceof Error ? err.message : "Failed to remove worktree";
+      this.error = toWorktreesUiMessage(err, "worktrees.error.removeFailed");
       throw err;
     } finally {
       this.mutating = false;
@@ -140,7 +163,7 @@ class WorktreesStore {
       await this.#loadWorktrees(this.repoRoot, this.selectedWorktreePath || this.projectPath);
       return result.prunedCount;
     } catch (err) {
-      this.error = err instanceof Error ? err.message : "Failed to prune worktrees";
+      this.error = toWorktreesUiMessage(err, "worktrees.error.pruneFailed");
       throw err;
     } finally {
       this.mutating = false;

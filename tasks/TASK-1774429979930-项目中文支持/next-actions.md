@@ -2,12 +2,19 @@
 
 ## Open
 
-- NA-1774463135000 继续盘点其他 store/组件里的历史 `Error.message` 兜底路径，优先处理仍会固化英文的用户可见错误链路。
+- NA-1774494169000 继续盘点除 worktrees 外剩余组件中的 `err.message || fallback string` 路径，优先处理主流程仍可见英文提示。
   - status: open
-  - created_at: 2026-03-26T02:25:35+08:00
+  - created_at: 2026-03-26T11:02:49+08:00
   - source: agent
 
 ## Closed
+
+- NA-1774463135000 继续盘点其他 store/组件里的历史 `Error.message` 兜底路径，优先处理仍会固化英文的用户可见错误链路。
+  - status: done
+  - created_at: 2026-03-26T02:25:35+08:00
+  - closed_at: 2026-03-26T11:02:49+08:00
+  - closed_by: agent
+  - source: agent
 
 - NA-1774461604000 继续盘点 `socket` RPC 请求层（如 `#requestRpc` / `#requestOrbitControl`）在 send 失败分支的 Error 文本回退，评估是否要统一 descriptor 透传到 Settings/其他页面。
   - status: done

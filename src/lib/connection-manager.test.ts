@@ -32,7 +32,10 @@ const socketMock: {
 
 mock.module("./auth.svelte", () => ({ auth: authMock }));
 mock.module("./config.svelte", () => ({ config: configMock }));
-mock.module("./socket.svelte", () => ({ socket: socketMock }));
+mock.module("./socket.svelte", () => ({
+  socket: socketMock,
+  getSocketErrorMessage: () => null,
+}));
 
 function installControlledTimers(options?: { allowCancelledExecution?: boolean }) {
   const allowCancelledExecution = options?.allowCancelledExecution ?? false;

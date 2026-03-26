@@ -21,6 +21,7 @@ beforeEach(() => {
       onMessage: () => () => {},
       send: socketSendMock,
     },
+    getSocketErrorMessage: () => null,
   }));
   mock.module("./threads.svelte", () => ({
     threads: {

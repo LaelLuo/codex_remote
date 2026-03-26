@@ -1,7 +1,12 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
   import { socket } from "../socket.svelte";
-  import { worktrees } from "../worktrees.svelte";
+  import {
+    renderWorktreesUiMessage,
+    toWorktreesUiMessage,
+    worktrees,
+    type WorktreesUiMessage,
+  } from "../worktrees.svelte";
   import { i18n } from "../i18n.svelte";
 
   type Step = "project" | "worktree";
@@ -28,12 +33,12 @@
   let currentPath = $state("");
   let parentPath = $state("");
   let browseLoading = $state(false);
-  let browseError = $state<string | null>(null);
+  let browseError = $state<WorktreesUiMessage | null>(null);
   let browseRequestId = 0;
   let searchStartPath = $state(readStoredPath(SEARCH_START_STORAGE_KEY));
 
   // Worktree action state
-  let actionError = $state<string | null>(null);
+  let actionError = $state<WorktreesUiMessage | null>(null);
   let actionMessage = $state<string | null>(null);
   let worktreeRootDir = $state(readStoredPath(WORKTREE_ROOT_STORAGE_KEY));
   let newWorktreePath = $state("");
@@ -98,7 +103,7 @@
       roots = result.roots ?? [];
     } catch (err) {
       if (requestId !== browseRequestId) return;
-      browseError = err instanceof Error ? err.message : i18n.t("worktreeModal.error.listDirsFailed");
+      browseError = toWorktreesUiMessage(err, "worktreeModal.error.listDirsFailed");
       dirs = [];
     } finally {
       if (requestId !== browseRequestId) return;
@@ -173,7 +178,7 @@
       }
       actionMessage = i18n.t("worktreeModal.action.createdWorktree");
     } catch (err) {
-      actionError = err instanceof Error ? err.message : i18n.t("worktreeModal.error.createWorktreeFailed");
+      actionError = toWorktreesUiMessage(err, "worktreeModal.error.createWorktreeFailed");
     }
   }
 
@@ -281,7 +286,7 @@
           {#if browseLoading}
             <div class="dir-status">{i18n.t("worktreeModal.loading")}</div>
           {:else if browseError}
-            <div class="dir-status dir-error">{browseError}</div>
+            <div class="dir-status dir-error">{renderWorktreesUiMessage(browseError, i18n.t.bind(i18n))}</div>
           {:else}
             <ul class="dir-list">
               {#if parentPath && parentPath !== currentPath}
@@ -354,7 +359,9 @@
       {/if}
 
       {#if actionError || worktrees.error}
-        <div class="status-msg status-error">{actionError || worktrees.error}</div>
+        <div class="status-msg status-error">
+          {renderWorktreesUiMessage(actionError || worktrees.error, i18n.t.bind(i18n))}
+        </div>
       {/if}
       {#if actionMessage}
         <div class="status-msg status-ok">{actionMessage}</div>

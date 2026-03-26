@@ -59,7 +59,10 @@ describe("anchors timeout reconciliation", () => {
     Object.defineProperty(globalThis, "$state", { value: <T>(value: T) => value, configurable: true, writable: true });
 
     resetAnchorsStoreSingleton();
-    mock.module("./socket.svelte", () => ({ socket }));
+    mock.module("./socket.svelte", () => ({
+      socket,
+      getSocketErrorMessage: () => null,
+    }));
     const { anchors } = await import("./anchors.svelte.ts");
 
     expect(socket.requestAnchors).toHaveBeenCalledTimes(1);

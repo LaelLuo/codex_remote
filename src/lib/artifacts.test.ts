@@ -136,7 +136,10 @@ describe("artifacts store", () => {
       configurable: true,
       writable: true,
     });
-    mock.module("./socket.svelte", () => ({ socket }));
+    mock.module("./socket.svelte", () => ({
+      socket,
+      getSocketErrorMessage: () => null,
+    }));
     resetArtifactsSingleton();
 
     const { artifacts } = await import("./artifacts.svelte.ts");

@@ -1,6 +1,11 @@
 <script lang="ts">
   import { socket } from "../socket.svelte";
   import { i18n } from "../i18n.svelte";
+  import {
+    renderWorktreesUiMessage,
+    toWorktreesUiMessage,
+    type WorktreesUiMessage,
+  } from "../worktrees.svelte";
 
   interface Props {
     value: string;
@@ -15,7 +20,7 @@
   let currentPath = $state("");
   let parentPath = $state("");
   let loading = $state(false);
-  let browseError = $state<string | null>(null);
+  let browseError = $state<WorktreesUiMessage | null>(null);
 
   async function browse(path?: string) {
     loading = true;
@@ -27,7 +32,7 @@
       parentPath = result.parent;
       browsing = true;
     } catch (err) {
-      browseError = err instanceof Error ? err.message : i18n.t("projectPicker.error.listDirsFailed");
+      browseError = toWorktreesUiMessage(err, "projectPicker.error.listDirsFailed");
       dirs = [];
     } finally {
       loading = false;
@@ -90,7 +95,7 @@
       {#if loading}
         <div class="dir-loading">{i18n.t("projectPicker.loading")}</div>
       {:else if browseError}
-        <div class="dir-error">{browseError}</div>
+        <div class="dir-error">{renderWorktreesUiMessage(browseError, i18n.t.bind(i18n))}</div>
       {:else}
         <ul class="dir-list">
           {#if parentPath && parentPath !== currentPath}

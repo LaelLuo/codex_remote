@@ -411,6 +411,11 @@ const en: MessageDict = {
   "worktreeModal.action.createdWorktree": "Created worktree",
   "worktreeModal.error.listDirsFailed": "Failed to list directories",
   "worktreeModal.error.createWorktreeFailed": "Failed to create worktree",
+  "worktrees.error.inspectFailed": "Failed to inspect git repository",
+  "worktrees.error.refreshFailed": "Failed to refresh worktrees",
+  "worktrees.error.createFailed": "Failed to create worktree",
+  "worktrees.error.removeFailed": "Failed to remove worktree",
+  "worktrees.error.pruneFailed": "Failed to prune worktrees",
 
   "planCard.header": "Proposed Plan",
   "planCard.status.plan": "Plan",
@@ -858,6 +863,11 @@ const zhCN: MessageDict = {
   "worktreeModal.action.createdWorktree": "已创建工作树",
   "worktreeModal.error.listDirsFailed": "读取目录列表失败",
   "worktreeModal.error.createWorktreeFailed": "创建工作树失败",
+  "worktrees.error.inspectFailed": "检查 Git 仓库失败",
+  "worktrees.error.refreshFailed": "刷新工作树失败",
+  "worktrees.error.createFailed": "创建工作树失败",
+  "worktrees.error.removeFailed": "移除工作树失败",
+  "worktrees.error.pruneFailed": "清理工作树失败",
 
   "planCard.header": "建议计划",
   "planCard.status.plan": "计划",

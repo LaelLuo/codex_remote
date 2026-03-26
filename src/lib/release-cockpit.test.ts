@@ -100,7 +100,10 @@ describe("release cockpit store", () => {
       configurable: true,
       writable: true,
     });
-    mock.module("./socket.svelte", () => ({ socket }));
+    mock.module("./socket.svelte", () => ({
+      socket,
+      getSocketErrorMessage: () => null,
+    }));
     resetReleaseCockpitSingleton();
 
     const { releaseCockpit } = await import("./release-cockpit.svelte.ts");

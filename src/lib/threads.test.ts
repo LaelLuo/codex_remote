@@ -38,7 +38,10 @@ const authMock = {
 
 const navigateMock = mock(() => {});
 
-mock.module("./socket.svelte", () => ({ socket: socketMock }));
+mock.module("./socket.svelte", () => ({
+  socket: socketMock,
+  getSocketErrorMessage: () => null,
+}));
 mock.module("./messages.svelte", () => ({ messages: messagesMock }));
 mock.module("./models.svelte", () => ({ models: modelsMock }));
 mock.module("./anchors.svelte", () => ({ anchors: anchorsMock }));

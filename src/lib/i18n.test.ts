@@ -166,12 +166,16 @@ describe("i18n store", () => {
     expect(i18n.t("projectPicker.noSubdirectories")).toBe("No subdirectories");
     expect(i18n.t("worktreeModal.searchStartDirectory")).toBe("Search start directory");
     expect(i18n.t("worktreeModal.gitRepositoryDetected")).toBe("Git repository detected");
+    expect(i18n.t("worktrees.error.inspectFailed")).toBe("Failed to inspect git repository");
+    expect(i18n.t("worktrees.error.createFailed")).toBe("Failed to create worktree");
 
     i18n.set("zh-CN");
     expect(i18n.t("projectPicker.browseDirectories")).toBe("浏览目录");
     expect(i18n.t("projectPicker.noSubdirectories")).toBe("没有子目录");
     expect(i18n.t("worktreeModal.searchStartDirectory")).toBe("搜索起始目录");
     expect(i18n.t("worktreeModal.gitRepositoryDetected")).toBe("检测到 Git 仓库");
+    expect(i18n.t("worktrees.error.inspectFailed")).toBe("检查 Git 仓库失败");
+    expect(i18n.t("worktrees.error.createFailed")).toBe("创建工作树失败");
   });
 
   test("translates reasoning and socket fallback labels", async () => {
