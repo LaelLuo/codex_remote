@@ -130,6 +130,31 @@ export function artifactTypeKey(rawType: string): string | null {
   return map[token] ?? null;
 }
 
+export function artifactStatusKey(rawStatus: string): string | null {
+  const normalized = rawStatus.trim().toLowerCase().replace(/[\s._-]+/g, "");
+  if (!normalized) return null;
+  const map: Record<string, string> = {
+    queued: "artifacts.status.queued",
+    pending: "artifacts.status.pending",
+    starting: "artifacts.status.starting",
+    running: "artifacts.status.running",
+    inprogress: "artifacts.status.running",
+    completed: "artifacts.status.completed",
+    success: "artifacts.status.completed",
+    succeeded: "artifacts.status.completed",
+    ready: "artifacts.status.ready",
+    failed: "artifacts.status.failed",
+    failure: "artifacts.status.failed",
+    errored: "artifacts.status.failed",
+    error: "artifacts.status.failed",
+    canceled: "artifacts.status.cancelled",
+    cancelled: "artifacts.status.cancelled",
+    blocked: "artifacts.status.blocked",
+    paused: "artifacts.status.paused",
+  };
+  return map[normalized] ?? null;
+}
+
 function normalizeArtifactLink(value: unknown): OrbitArtifactLink | null {
   if (typeof value === "string") {
     const href = toStringValue(value);

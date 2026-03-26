@@ -26,3 +26,4 @@
 - 2026-03-26T12:24:51+08:00 [agent] 本轮完成 artifacts 类型标签本地化：`artifacts.ts` 移除 `humanizeArtifactType` 英文固化，改为 `artifactTypeKey` 映射 i18n key；`ArtifactsTimeline.svelte` 在渲染层翻译 type/title（含旧英文标题兜底识别）；补充 artifacts/i18n 测试并通过 lint。
 - 2026-03-26T12:29:28+08:00 [agent] 返修历史兼容遗漏：`artifactTypeKey` 新增对旧持久化标题 `tool call` / `collab call` 的识别映射，确保 artifacts 时间线切换中文时不再残留英文；补充对应单测并通过。
 - 2026-03-26T13:30:30+08:00 [agent] 本轮完成 ReleaseCockpit 状态标签本地化：新增 `releaseCheckStatusKey` / `releaseLifecycleLabelKey` 映射并在 `ReleaseCockpit.svelte` 渲染层翻译 `check.status`、`status.status`、`status.phase`，避免中文界面展示 pass/running/completed 等英文；补充 i18n 与 release-cockpit 测试并通过 lint。
+- 2026-03-26T13:51:30+08:00 [agent] 本轮补齐剩余状态标签：`releaseLogLevelKey` 映射并在 `ReleaseCockpit.svelte` 本地化 `log.level`；`artifactStatusKey` 映射并在 `ArtifactsTimeline.svelte` 本地化 `artifact.status`；新增对应 i18n 词条与 artifacts/release-cockpit/i18n 测试断言，验证通过。

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { artifactTypeKey } from "../artifacts";
+  import { artifactStatusKey, artifactTypeKey } from "../artifacts";
   import type { ArtifactsUiMessage } from "../artifacts.svelte";
   import type { OrbitArtifact } from "../types";
   import { i18n } from "../i18n.svelte";
@@ -61,6 +61,11 @@
     if (legacyKey) return i18n.t(legacyKey);
     return title;
   }
+
+  function renderArtifactStatus(status: string): string {
+    const key = artifactStatusKey(status);
+    return key ? i18n.t(key) : status;
+  }
 </script>
 
 <section class="artifacts-panel stack" aria-live="polite">
@@ -96,7 +101,7 @@
           <div class="timeline-meta row">
             <span class="meta-chip">{renderArtifactType(artifact.type)}</span>
             {#if artifact.status}
-              <span class="meta-chip status">{artifact.status}</span>
+              <span class="meta-chip status">{renderArtifactStatus(artifact.status)}</span>
             {/if}
           </div>
           {#if artifactPaths(artifact).length > 0}

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
-import { artifactTypeKey, extractMultiDispatchPayloads, normalizeArtifactsListResult } from "./artifacts";
+import { artifactStatusKey, artifactTypeKey, extractMultiDispatchPayloads, normalizeArtifactsListResult } from "./artifacts";
 
 const STORE_KEY = "__codex_remote_artifacts_store__";
 
@@ -227,6 +227,17 @@ describe("artifacts store", () => {
     expect(artifactTypeKey("web-search")).toBe("artifacts.type.webSearch");
     expect(artifactTypeKey("collab call")).toBe("artifacts.type.collabCall");
     expect(artifactTypeKey("unknown")).toBeNull();
+  });
+
+  test("maps artifact status tokens to translation keys", () => {
+    expect(artifactStatusKey("running")).toBe("artifacts.status.running");
+    expect(artifactStatusKey("in-progress")).toBe("artifacts.status.running");
+    expect(artifactStatusKey("completed")).toBe("artifacts.status.completed");
+    expect(artifactStatusKey("success")).toBe("artifacts.status.completed");
+    expect(artifactStatusKey("failed")).toBe("artifacts.status.failed");
+    expect(artifactStatusKey("error")).toBe("artifacts.status.failed");
+    expect(artifactStatusKey("blocked")).toBe("artifacts.status.blocked");
+    expect(artifactStatusKey("custom-status")).toBeNull();
   });
 
   test("keeps type fallback title as raw token for UI-layer translation", () => {

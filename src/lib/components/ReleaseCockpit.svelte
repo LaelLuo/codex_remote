@@ -1,6 +1,6 @@
 <script lang="ts">
   import { i18n } from "../i18n.svelte";
-  import { releaseCheckStatusKey, releaseLifecycleLabelKey } from "../release-cockpit";
+  import { releaseCheckStatusKey, releaseLifecycleLabelKey, releaseLogLevelKey } from "../release-cockpit";
   import type { ReleaseCockpitUiMessage } from "../release-cockpit.svelte";
   import type { ReleaseInspectResult, ReleaseStartParams, ReleaseStatusResult } from "../types";
 
@@ -106,6 +106,11 @@
     const key = releaseLifecycleLabelKey(status);
     return key ? i18n.t(key) : status;
   }
+
+  function renderLogLevel(level: string): string {
+    const key = releaseLogLevelKey(level);
+    return key ? i18n.t(key) : level;
+  }
 </script>
 
 <div class="section stack">
@@ -207,7 +212,7 @@
               {#each status.logs as log (log.id)}
                 <div class="log-line">
                   <span class="log-ts">{formatTs(log.ts)}</span>
-                  <span class="log-level">{log.level}</span>
+                  <span class="log-level">{renderLogLevel(log.level)}</span>
                   <span class="log-message">{log.message}</span>
                 </div>
               {/each}

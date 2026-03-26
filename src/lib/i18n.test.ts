@@ -297,4 +297,28 @@ describe("i18n store", () => {
     expect(i18n.t("release.lifecycle.completed")).toBe("已完成");
     expect(i18n.t("release.lifecycle.blocked")).toBe("已阻塞");
   });
+
+  test("translates release log-level and artifact status labels", async () => {
+    const { i18n } = await loadI18n();
+    expect(i18n.t("release.logLevel.info")).toBe("Info");
+    expect(i18n.t("release.logLevel.warn")).toBe("Warn");
+    expect(i18n.t("release.logLevel.error")).toBe("Error");
+    expect(i18n.t("release.logLevel.debug")).toBe("Debug");
+
+    expect(i18n.t("artifacts.status.running")).toBe("Running");
+    expect(i18n.t("artifacts.status.completed")).toBe("Completed");
+    expect(i18n.t("artifacts.status.failed")).toBe("Failed");
+    expect(i18n.t("artifacts.status.blocked")).toBe("Blocked");
+
+    i18n.set("zh-CN");
+    expect(i18n.t("release.logLevel.info")).toBe("信息");
+    expect(i18n.t("release.logLevel.warn")).toBe("警告");
+    expect(i18n.t("release.logLevel.error")).toBe("错误");
+    expect(i18n.t("release.logLevel.debug")).toBe("调试");
+
+    expect(i18n.t("artifacts.status.running")).toBe("进行中");
+    expect(i18n.t("artifacts.status.completed")).toBe("已完成");
+    expect(i18n.t("artifacts.status.failed")).toBe("失败");
+    expect(i18n.t("artifacts.status.blocked")).toBe("已阻塞");
+  });
 });

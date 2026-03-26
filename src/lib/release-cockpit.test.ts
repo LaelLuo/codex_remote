@@ -5,6 +5,7 @@ import {
   normalizeReleaseStatusResult,
   releaseCheckStatusKey,
   releaseLifecycleLabelKey,
+  releaseLogLevelKey,
 } from "./release-cockpit";
 
 const STORE_KEY = "__codex_remote_release_cockpit_store__";
@@ -72,6 +73,13 @@ describe("release parser", () => {
     expect(releaseLifecycleLabelKey("in_progress")).toBe("release.lifecycle.running");
     expect(releaseLifecycleLabelKey("blocked")).toBe("release.lifecycle.blocked");
     expect(releaseLifecycleLabelKey("weird-custom")).toBeNull();
+
+    expect(releaseLogLevelKey("info")).toBe("release.logLevel.info");
+    expect(releaseLogLevelKey("log")).toBe("release.logLevel.info");
+    expect(releaseLogLevelKey("warning")).toBe("release.logLevel.warn");
+    expect(releaseLogLevelKey("error")).toBe("release.logLevel.error");
+    expect(releaseLogLevelKey("debug")).toBe("release.logLevel.debug");
+    expect(releaseLogLevelKey("verbose-custom")).toBeNull();
   });
 });
 

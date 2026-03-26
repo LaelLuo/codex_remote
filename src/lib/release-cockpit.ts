@@ -101,6 +101,17 @@ export function releaseLifecycleLabelKey(value: string): string | null {
   return map[normalized] ?? null;
 }
 
+export function releaseLogLevelKey(value: string): string | null {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return null;
+  if (normalized.includes("debug") || normalized.includes("trace")) return "release.logLevel.debug";
+  if (normalized === "log") return "release.logLevel.info";
+  if (normalized.includes("info")) return "release.logLevel.info";
+  if (normalized.includes("warn")) return "release.logLevel.warn";
+  if (normalized.includes("error") || normalized.includes("fail")) return "release.logLevel.error";
+  return null;
+}
+
 function normalizeReleaseCheck(value: unknown, index: number): ReleaseCheck | null {
   if (typeof value === "string") {
     return {
