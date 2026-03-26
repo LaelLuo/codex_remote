@@ -62,6 +62,45 @@ function normalizeCheckStatus(value: unknown): ReleaseCheckStatus {
   return "unknown";
 }
 
+export function releaseCheckStatusKey(value: string): string | null {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return null;
+  if (normalized.includes("pass") || normalized.includes("ok") || normalized.includes("ready")) {
+    return "release.checkStatus.pass";
+  }
+  if (normalized.includes("warn")) return "release.checkStatus.warn";
+  if (normalized.includes("fail") || normalized.includes("error") || normalized.includes("block")) {
+    return "release.checkStatus.fail";
+  }
+  if (normalized.includes("unknown")) return "release.checkStatus.unknown";
+  return null;
+}
+
+export function releaseLifecycleLabelKey(value: string): string | null {
+  const normalized = value.trim().toLowerCase().replace(/[\s_-]+/g, "");
+  if (!normalized) return null;
+
+  const map: Record<string, string> = {
+    queued: "release.lifecycle.queued",
+    pending: "release.lifecycle.pending",
+    starting: "release.lifecycle.starting",
+    running: "release.lifecycle.running",
+    inprogress: "release.lifecycle.running",
+    completed: "release.lifecycle.completed",
+    success: "release.lifecycle.completed",
+    succeeded: "release.lifecycle.completed",
+    failed: "release.lifecycle.failed",
+    failure: "release.lifecycle.failed",
+    errored: "release.lifecycle.failed",
+    canceled: "release.lifecycle.cancelled",
+    cancelled: "release.lifecycle.cancelled",
+    blocked: "release.lifecycle.blocked",
+    paused: "release.lifecycle.paused",
+  };
+
+  return map[normalized] ?? null;
+}
+
 function normalizeReleaseCheck(value: unknown, index: number): ReleaseCheck | null {
   if (typeof value === "string") {
     return {

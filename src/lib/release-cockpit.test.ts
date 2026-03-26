@@ -3,6 +3,8 @@ import {
   isReleaseTerminalStatus,
   normalizeReleaseInspectResult,
   normalizeReleaseStatusResult,
+  releaseCheckStatusKey,
+  releaseLifecycleLabelKey,
 } from "./release-cockpit";
 
 const STORE_KEY = "__codex_remote_release_cockpit_store__";
@@ -57,6 +59,19 @@ describe("release parser", () => {
     expect(result.assets[0].path).toBe("dist/app.zip");
     expect(isReleaseTerminalStatus("completed")).toBe(true);
     expect(isReleaseTerminalStatus("running")).toBe(false);
+  });
+
+  test("maps check/status/phase tokens to translatable keys", () => {
+    expect(releaseCheckStatusKey("pass")).toBe("release.checkStatus.pass");
+    expect(releaseCheckStatusKey("warn")).toBe("release.checkStatus.warn");
+    expect(releaseCheckStatusKey("fail")).toBe("release.checkStatus.fail");
+    expect(releaseCheckStatusKey("unknown")).toBe("release.checkStatus.unknown");
+
+    expect(releaseLifecycleLabelKey("running")).toBe("release.lifecycle.running");
+    expect(releaseLifecycleLabelKey("completed")).toBe("release.lifecycle.completed");
+    expect(releaseLifecycleLabelKey("in_progress")).toBe("release.lifecycle.running");
+    expect(releaseLifecycleLabelKey("blocked")).toBe("release.lifecycle.blocked");
+    expect(releaseLifecycleLabelKey("weird-custom")).toBeNull();
   });
 });
 

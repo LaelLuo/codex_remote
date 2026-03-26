@@ -277,4 +277,24 @@ describe("i18n store", () => {
     expect(i18n.t("artifacts.type.webSearch")).toBe("网页搜索");
     expect(i18n.t("artifacts.type.collabCall")).toBe("协作调用");
   });
+
+  test("translates release check and lifecycle labels", async () => {
+    const { i18n } = await loadI18n();
+    expect(i18n.t("release.checkStatus.pass")).toBe("Pass");
+    expect(i18n.t("release.checkStatus.fail")).toBe("Fail");
+    expect(i18n.t("release.checkStatus.warn")).toBe("Warn");
+    expect(i18n.t("release.checkStatus.unknown")).toBe("Unknown");
+    expect(i18n.t("release.lifecycle.running")).toBe("Running");
+    expect(i18n.t("release.lifecycle.completed")).toBe("Completed");
+    expect(i18n.t("release.lifecycle.blocked")).toBe("Blocked");
+
+    i18n.set("zh-CN");
+    expect(i18n.t("release.checkStatus.pass")).toBe("通过");
+    expect(i18n.t("release.checkStatus.fail")).toBe("失败");
+    expect(i18n.t("release.checkStatus.warn")).toBe("警告");
+    expect(i18n.t("release.checkStatus.unknown")).toBe("未知");
+    expect(i18n.t("release.lifecycle.running")).toBe("进行中");
+    expect(i18n.t("release.lifecycle.completed")).toBe("已完成");
+    expect(i18n.t("release.lifecycle.blocked")).toBe("已阻塞");
+  });
 });

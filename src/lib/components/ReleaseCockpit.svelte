@@ -1,5 +1,6 @@
 <script lang="ts">
   import { i18n } from "../i18n.svelte";
+  import { releaseCheckStatusKey, releaseLifecycleLabelKey } from "../release-cockpit";
   import type { ReleaseCockpitUiMessage } from "../release-cockpit.svelte";
   import type { ReleaseInspectResult, ReleaseStartParams, ReleaseStatusResult } from "../types";
 
@@ -95,6 +96,16 @@
     if (message.kind === "text") return message.text;
     return i18n.t(message.key, message.params);
   }
+
+  function renderCheckStatus(status: string): string {
+    const key = releaseCheckStatusKey(status);
+    return key ? i18n.t(key) : status;
+  }
+
+  function renderLifecycleLabel(status: string): string {
+    const key = releaseLifecycleLabelKey(status);
+    return key ? i18n.t(key) : status;
+  }
 </script>
 
 <div class="section stack">
@@ -163,7 +174,7 @@
               {#each inspect.checks as check (check.id)}
                 <li>
                   <span class="check-label">{check.label}</span>
-                  <span class="badge {statusTone(check.status)}">{check.status}</span>
+                  <span class="badge {statusTone(check.status)}">{renderCheckStatus(check.status)}</span>
                   {#if check.detail}
                     <p class="hint">{check.detail}</p>
                   {/if}
@@ -185,9 +196,9 @@
         <div class="status-card stack">
           <div class="row readiness-row">
             <span class="status-label">{i18n.t("release.statusLabel", { releaseId: status.releaseId })}</span>
-            <span class="badge {statusTone(status.status)}">{status.status}</span>
+            <span class="badge {statusTone(status.status)}">{renderLifecycleLabel(status.status)}</span>
             {#if status.phase}
-              <span class="badge neutral">{status.phase}</span>
+              <span class="badge neutral">{renderLifecycleLabel(status.phase)}</span>
             {/if}
           </div>
 
