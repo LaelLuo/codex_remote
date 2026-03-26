@@ -243,4 +243,22 @@ describe("i18n store", () => {
     expect(i18n.t("message.statusLabel", { status: "running" })).toBe("状态：running");
     expect(i18n.t("artifacts.error.loadFailed")).toBe("加载产物失败");
   });
+
+  test("translates release cockpit info and error fallback labels", async () => {
+    const { i18n } = await loadI18n();
+    expect(i18n.t("release.info.checksPassed")).toBe("Release checks passed.");
+    expect(i18n.t("release.info.checksAttention")).toBe("Release checks require attention.");
+    expect(i18n.t("release.info.started", { releaseId: "rel-1" })).toBe("Release started (rel-1).");
+    expect(i18n.t("release.error.inspectFailed")).toBe("Failed to inspect release readiness");
+    expect(i18n.t("release.error.startFailed")).toBe("Failed to start release");
+    expect(i18n.t("release.error.statusLoadFailed")).toBe("Failed to load release status");
+
+    i18n.set("zh-CN");
+    expect(i18n.t("release.info.checksPassed")).toBe("发布检查已通过。");
+    expect(i18n.t("release.info.checksAttention")).toBe("发布检查需要关注。");
+    expect(i18n.t("release.info.started", { releaseId: "rel-1" })).toBe("发布已启动（rel-1）。");
+    expect(i18n.t("release.error.inspectFailed")).toBe("检查发布就绪状态失败");
+    expect(i18n.t("release.error.startFailed")).toBe("启动发布失败");
+    expect(i18n.t("release.error.statusLoadFailed")).toBe("加载发布状态失败");
+  });
 });

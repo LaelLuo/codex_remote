@@ -1,5 +1,5 @@
 import type { ReleaseInspectResult, ReleaseStartParams, ReleaseStatusResult } from "./types";
-import { socket } from "./socket.svelte";
+import { getSocketErrorMessage, socket, type SocketErrorMessage } from "./socket.svelte";
 import { extractMultiDispatchPayloads } from "./artifacts";
 import {
   isReleaseTerminalStatus,
@@ -12,6 +12,28 @@ import {
 const STORE_KEY = "__codex_remote_release_cockpit_store__";
 const POLL_INTERVAL_MS = 2_500;
 
+export type ReleaseCockpitUiMessage = SocketErrorMessage;
+
+function messageKey(key: string, params?: Record<string, string | number>): ReleaseCockpitUiMessage {
+  return { kind: "key", key, ...(params ? { params } : {}) };
+}
+
+function messageText(text: string): ReleaseCockpitUiMessage {
+  return { kind: "text", text };
+}
+
+function toReleaseCockpitUiMessage(error: unknown, fallbackKey: string): ReleaseCockpitUiMessage {
+  const socketMessage = getSocketErrorMessage(error);
+  if (socketMessage) return socketMessage;
+  if (error instanceof Error && error.message.trim()) {
+    return messageText(error.message);
+  }
+  if (typeof error === "string" && error.trim()) {
+    return messageText(error);
+  }
+  return messageKey(fallbackKey);
+}
+
 class ReleaseCockpitStore {
   inspect = $state<ReleaseInspectResult | null>(null);
   status = $state<ReleaseStatusResult | null>(null);
@@ -20,8 +42,8 @@ class ReleaseCockpitStore {
   startLoading = $state(false);
   statusLoading = $state(false);
   polling = $state(false);
-  error = $state<string | null>(null);
-  info = $state<string | null>(null);
+  error = $state<ReleaseCockpitUiMessage | null>(null);
+  info = $state<ReleaseCockpitUiMessage | null>(null);
 
   #pollTimer: ReturnType<typeof setTimeout> | null = null;
   #pollAnchorId: string | undefined;
@@ -51,9 +73,11 @@ class ReleaseCockpitStore {
     try {
       const result = await socket.releaseInspect(params);
       this.inspect = normalizeReleaseInspectResult(result);
-      this.info = this.inspect.ready ? "Release checks passed." : "Release checks require attention.";
+      this.info = this.inspect.ready
+        ? messageKey("release.info.checksPassed")
+        : messageKey("release.info.checksAttention");
     } catch (err) {
-      this.error = err instanceof Error ? err.message : "Failed to inspect release readiness";
+      this.error = toReleaseCockpitUiMessage(err, "release.error.inspectFailed");
     } finally {
       this.inspectLoading = false;
     }
@@ -84,13 +108,13 @@ class ReleaseCockpitStore {
         assets: [],
         links: [],
       };
-      this.info = `Release started (${startResult.releaseId}).`;
+      this.info = messageKey("release.info.started", { releaseId: startResult.releaseId });
       await this.pollStatus(params.anchorId);
       if (!isReleaseTerminalStatus(this.status?.status)) {
         this.startPolling(params.anchorId);
       }
     } catch (err) {
-      this.error = err instanceof Error ? err.message : "Failed to start release";
+      this.error = toReleaseCockpitUiMessage(err, "release.error.startFailed");
     } finally {
       this.startLoading = false;
     }
@@ -111,13 +135,13 @@ class ReleaseCockpitStore {
       this.status = mergeReleaseStatus(this.status, normalized);
       this.releaseId = this.status.releaseId;
       if (this.status.error) {
-        this.error = this.status.error;
+        this.error = messageText(this.status.error);
       }
       if (isReleaseTerminalStatus(this.status.status)) {
         this.stopPolling();
       }
     } catch (err) {
-      this.error = err instanceof Error ? err.message : "Failed to load release status";
+      this.error = toReleaseCockpitUiMessage(err, "release.error.statusLoadFailed");
     } finally {
       this.statusLoading = false;
     }
@@ -172,7 +196,7 @@ class ReleaseCockpitStore {
       this.releaseId = normalized.releaseId;
       this.status = mergeReleaseStatus(this.status, normalized);
       if (this.status?.error) {
-        this.error = this.status.error;
+        this.error = messageText(this.status.error);
       } else if (this.error) {
         this.error = null;
       }

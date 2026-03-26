@@ -1,5 +1,6 @@
 <script lang="ts">
   import { i18n } from "../i18n.svelte";
+  import type { ReleaseCockpitUiMessage } from "../release-cockpit.svelte";
   import type { ReleaseInspectResult, ReleaseStartParams, ReleaseStatusResult } from "../types";
 
   type Props = {
@@ -12,8 +13,8 @@
     startLoading: boolean;
     statusLoading: boolean;
     polling: boolean;
-    error: string | null;
-    info: string | null;
+    error: ReleaseCockpitUiMessage | null;
+    info: ReleaseCockpitUiMessage | null;
     onInspect: (params: { repoPath?: string; targetRef?: string; tag?: string }) => void;
     onStart: (params: ReleaseStartParams) => void;
     onPoll: () => void;
@@ -87,6 +88,12 @@
       ...(tag.trim() ? { tag: tag.trim() } : {}),
       ...(dryRun ? { dryRun: true } : {}),
     });
+  }
+
+  function renderMessage(message: ReleaseCockpitUiMessage | null): string {
+    if (!message) return "";
+    if (message.kind === "text") return message.text;
+    return i18n.t(message.key, message.params);
   }
 </script>
 
@@ -233,10 +240,10 @@
       {/if}
 
       {#if info}
-        <p class="hint hint-local">{info}</p>
+        <p class="hint hint-local">{renderMessage(info)}</p>
       {/if}
       {#if error}
-        <p class="hint hint-error">{error}</p>
+        <p class="hint hint-error">{renderMessage(error)}</p>
       {/if}
     {/if}
   </div>

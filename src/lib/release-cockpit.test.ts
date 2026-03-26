@@ -11,6 +11,11 @@ function resetReleaseCockpitSingleton() {
   delete (globalThis as Record<string, unknown>)[STORE_KEY];
 }
 
+async function loadFreshReleaseCockpitModule() {
+  const nonce = `${Date.now()}-${Math.random()}`;
+  return import(`./release-cockpit.svelte.ts?release-cockpit-test=${nonce}`);
+}
+
 afterEach(() => {
   vi.useRealTimers();
   mock.restore();
@@ -106,15 +111,24 @@ describe("release cockpit store", () => {
     }));
     resetReleaseCockpitSingleton();
 
-    const { releaseCockpit } = await import("./release-cockpit.svelte.ts");
+    const { releaseCockpit } = await loadFreshReleaseCockpitModule();
 
     await releaseCockpit.inspectRelease({ repoPath: "/repo" });
     expect(releaseCockpit.inspect?.ready).toBe(true);
+    expect(releaseCockpit.info).toEqual({
+      kind: "key",
+      key: "release.info.checksPassed",
+    });
 
     await releaseCockpit.startRelease({ repoPath: "/repo", tag: "v1.0.0" });
     expect(releaseCockpit.releaseId).toBe("release-1");
     expect(releaseCockpit.status?.status).toBe("running");
     expect(releaseCockpit.polling).toBe(true);
+    expect(releaseCockpit.info).toEqual({
+      kind: "key",
+      key: "release.info.started",
+      params: { releaseId: "release-1" },
+    });
 
     protocolHandlers[0]({
       type: "orbit.multi-dispatch",
@@ -137,5 +151,97 @@ describe("release cockpit store", () => {
     expect(releaseCockpit.status?.status).toBe("completed");
     expect(releaseCockpit.polling).toBe(false);
     expect(releaseCockpit.status?.assets[0]?.path).toBe("dist/bundle.zip");
+  });
+
+  test("uses fallback key messages for inspect/start/status errors", async () => {
+    const protocolHandlers: Array<(msg: Record<string, unknown>) => void> = [];
+    const socket = {
+      releaseInspect: mock(async () => {
+        throw {};
+      }),
+      releaseStart: mock(async () => {
+        throw {};
+      }),
+      releaseStatus: mock(async () => {
+        throw {};
+      }),
+      onProtocol(handler: (msg: Record<string, unknown>) => void) {
+        protocolHandlers.push(handler);
+        return () => {};
+      },
+    };
+
+    Object.defineProperty(globalThis, "$state", {
+      value: <T>(value: T) => value,
+      configurable: true,
+      writable: true,
+    });
+    mock.module("./socket.svelte", () => ({
+      socket,
+      getSocketErrorMessage: () => null,
+    }));
+    resetReleaseCockpitSingleton();
+
+    const { releaseCockpit } = await loadFreshReleaseCockpitModule();
+
+    await releaseCockpit.inspectRelease({ repoPath: "/repo" });
+    expect(releaseCockpit.error).toEqual({
+      kind: "key",
+      key: "release.error.inspectFailed",
+    });
+
+    await releaseCockpit.startRelease({ repoPath: "/repo" });
+    expect(releaseCockpit.error).toEqual({
+      kind: "key",
+      key: "release.error.startFailed",
+    });
+
+    releaseCockpit.releaseId = "release-1";
+    await releaseCockpit.pollStatus();
+    expect(releaseCockpit.error).toEqual({
+      kind: "key",
+      key: "release.error.statusLoadFailed",
+    });
+  });
+
+  test("prefers socket descriptor when release RPC throws structured error", async () => {
+    const marker = { message: "marker" };
+    const socket = {
+      releaseInspect: mock(async () => {
+        throw marker;
+      }),
+      releaseStart: mock(async () => ({
+        releaseId: "unused",
+        status: "queued",
+      })),
+      releaseStatus: mock(async () => ({
+        releaseId: "unused",
+        status: "queued",
+      })),
+      onProtocol: () => () => {},
+    };
+
+    Object.defineProperty(globalThis, "$state", {
+      value: <T>(value: T) => value,
+      configurable: true,
+      writable: true,
+    });
+    mock.module("./socket.svelte", () => ({
+      socket,
+      getSocketErrorMessage: (err: unknown) => {
+        if (err === marker) {
+          return { kind: "key", key: "socket.rpc.timeout" };
+        }
+        return null;
+      },
+    }));
+    resetReleaseCockpitSingleton();
+
+    const { releaseCockpit } = await loadFreshReleaseCockpitModule();
+    await releaseCockpit.inspectRelease({ repoPath: "/repo" });
+    expect(releaseCockpit.error).toEqual({
+      kind: "key",
+      key: "socket.rpc.timeout",
+    });
   });
 });
