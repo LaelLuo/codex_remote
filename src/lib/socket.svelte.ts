@@ -361,18 +361,25 @@ class SocketStore {
     );
   }
 
-  listDirs(path?: string, startPath?: string): Promise<ListDirsResult> {
+  listDirs(path?: string, startPath?: string, anchorId?: string): Promise<ListDirsResult> {
     return this.#requestRpc<ListDirsResult>(
       "anchor.listDirs",
-      { path: path ?? "", startPath: startPath ?? "" },
+      {
+        path: path ?? "",
+        startPath: startPath ?? "",
+        ...(anchorId?.trim() ? { anchorId: anchorId.trim() } : {}),
+      },
       "dir",
     );
   }
 
-  gitInspect(path: string): Promise<GitInspectResult> {
+  gitInspect(path: string, anchorId?: string): Promise<GitInspectResult> {
     return this.#requestRpc<GitInspectResult>(
       "anchor.git.inspect",
-      { path },
+      {
+        path,
+        ...(anchorId?.trim() ? { anchorId: anchorId.trim() } : {}),
+      },
       "git-inspect",
     );
   }
@@ -413,10 +420,13 @@ class SocketStore {
     );
   }
 
-  gitWorktreeList(repoRoot: string): Promise<GitWorktreeListResult> {
+  gitWorktreeList(repoRoot: string, anchorId?: string): Promise<GitWorktreeListResult> {
     return this.#requestRpc<GitWorktreeListResult>(
       "anchor.git.worktree.list",
-      { repoRoot },
+      {
+        repoRoot,
+        ...(anchorId?.trim() ? { anchorId: anchorId.trim() } : {}),
+      },
       "git-worktree-list",
     );
   }
@@ -429,18 +439,31 @@ class SocketStore {
     );
   }
 
-  gitWorktreeRemove(repoRoot: string, path: string, force = false): Promise<GitWorktreeRemoveResult> {
+  gitWorktreeRemove(
+    repoRoot: string,
+    path: string,
+    force = false,
+    anchorId?: string,
+  ): Promise<GitWorktreeRemoveResult> {
     return this.#requestRpc<GitWorktreeRemoveResult>(
       "anchor.git.worktree.remove",
-      { repoRoot, path, force },
+      {
+        repoRoot,
+        path,
+        force,
+        ...(anchorId?.trim() ? { anchorId: anchorId.trim() } : {}),
+      },
       "git-worktree-remove",
     );
   }
 
-  gitWorktreePrune(repoRoot: string): Promise<GitWorktreePruneResult> {
+  gitWorktreePrune(repoRoot: string, anchorId?: string): Promise<GitWorktreePruneResult> {
     return this.#requestRpc<GitWorktreePruneResult>(
       "anchor.git.worktree.prune",
-      { repoRoot },
+      {
+        repoRoot,
+        ...(anchorId?.trim() ? { anchorId: anchorId.trim() } : {}),
+      },
       "git-worktree-prune",
     );
   }

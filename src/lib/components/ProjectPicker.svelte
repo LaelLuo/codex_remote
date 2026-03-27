@@ -3,6 +3,7 @@
   import { i18n } from "../i18n.svelte";
   import {
     renderWorktreesUiMessage,
+    resolveWorktreeAnchorId,
     toWorktreesUiMessage,
     type WorktreesUiMessage,
   } from "../worktrees.svelte";
@@ -26,7 +27,8 @@
     loading = true;
     browseError = null;
     try {
-      const result = await socket.listDirs(path);
+      const anchorId = resolveWorktreeAnchorId();
+      const result = await socket.listDirs(path, undefined, anchorId ?? undefined);
       dirs = result.dirs;
       currentPath = result.current;
       parentPath = result.parent;

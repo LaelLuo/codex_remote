@@ -13,6 +13,12 @@ const gitWorktreeListMock = mock(async () => ({
 const gitWorktreeCreateMock = mock(async () => ({ path: "/repo/new" }));
 const gitWorktreeRemoveMock = mock(async () => ({ removed: true }));
 const gitWorktreePruneMock = mock(async () => ({ prunedCount: 0 }));
+const anchorsMock = {
+  selectedId: null as string | null,
+};
+const authMock = {
+  isLocalMode: false,
+};
 
 const socketMock = {
   gitInspect: gitInspectMock,
@@ -34,6 +40,9 @@ function installSocketMock() {
     },
   }));
 }
+
+mock.module("./anchors.svelte", () => ({ anchors: anchorsMock }));
+mock.module("./auth.svelte", () => ({ auth: authMock }));
 
 const originalStateDescriptor = Object.getOwnPropertyDescriptor(globalThis, "$state");
 
@@ -71,6 +80,8 @@ beforeEach(() => {
   mock.clearAllMocks();
   installGlobal("$state", <T>(value: T) => value);
   clearStoreSingleton();
+  anchorsMock.selectedId = null;
+  authMock.isLocalMode = false;
 });
 
 afterEach(() => {
@@ -132,5 +143,36 @@ describe("worktrees error messages", () => {
       kind: "text",
       text: "backend exploded",
     });
+  });
+
+  test("forwards selected anchor id during remote inspect", async () => {
+    anchorsMock.selectedId = "anchor-1";
+    const { worktrees } = await loadFreshWorktreesModule();
+
+    await worktrees.inspect("/repo");
+
+    expect(gitInspectMock).toHaveBeenCalledWith("/repo", "anchor-1");
+    expect(gitWorktreeListMock).toHaveBeenCalledWith("/repo", "anchor-1");
+  });
+
+  test("forwards selected anchor id for remote worktree mutations", async () => {
+    anchorsMock.selectedId = "anchor-1";
+    const { worktrees } = await loadFreshWorktreesModule();
+    worktrees.repoRoot = "/repo";
+    worktrees.projectPath = "/repo";
+    worktrees.selectedWorktreePath = "/repo";
+
+    await worktrees.create({ path: "/repo/new" });
+    expect(gitWorktreeCreateMock).toHaveBeenCalledWith({
+      repoRoot: "/repo",
+      path: "/repo/new",
+      anchorId: "anchor-1",
+    });
+
+    await worktrees.remove("/repo/new", true);
+    expect(gitWorktreeRemoveMock).toHaveBeenCalledWith("/repo", "/repo/new", true, "anchor-1");
+
+    await worktrees.prune();
+    expect(gitWorktreePruneMock).toHaveBeenCalledWith("/repo", "anchor-1");
   });
 });

@@ -367,6 +367,103 @@ describe("socket rpc helpers", () => {
     socket.disconnect();
   });
 
+  test("includes anchorId in directory and worktree RPC params when provided", async () => {
+    const { socket } = await loadFreshSocketModule();
+    socket.connect("ws://localhost:8788/ws/client");
+    const ws = FakeWebSocket.instances[0];
+    ws.open();
+
+    const listPromise = socket.listDirs("/repo", undefined, "anchor-1");
+    const listRequest = JSON.parse(ws.sent[0]) as {
+      id: string;
+      method: string;
+      params: { anchorId?: string; path: string; startPath: string };
+    };
+    expect(listRequest.method).toBe("anchor.listDirs");
+    expect(listRequest.params.anchorId).toBe("anchor-1");
+    ws.emitMessage({
+      id: listRequest.id,
+      result: { dirs: [], parent: "/", current: "/repo" },
+    });
+    await listPromise;
+
+    const inspectPromise = socket.gitInspect("/repo", "anchor-1");
+    const inspectRequest = JSON.parse(ws.sent[1]) as {
+      id: string;
+      method: string;
+      params: { anchorId?: string; path: string };
+    };
+    expect(inspectRequest.method).toBe("anchor.git.inspect");
+    expect(inspectRequest.params.anchorId).toBe("anchor-1");
+    ws.emitMessage({
+      id: inspectRequest.id,
+      result: { isGitRepo: true, repoRoot: "/repo", currentBranch: "main" },
+    });
+    await inspectPromise;
+
+    const listWorktreesPromise = socket.gitWorktreeList("/repo", "anchor-1");
+    const listWorktreesRequest = JSON.parse(ws.sent[2]) as {
+      id: string;
+      method: string;
+      params: { anchorId?: string; repoRoot: string };
+    };
+    expect(listWorktreesRequest.method).toBe("anchor.git.worktree.list");
+    expect(listWorktreesRequest.params.anchorId).toBe("anchor-1");
+    ws.emitMessage({
+      id: listWorktreesRequest.id,
+      result: { repoRoot: "/repo", mainPath: "/repo", worktrees: [] },
+    });
+    await listWorktreesPromise;
+
+    const createPromise = socket.gitWorktreeCreate({
+      repoRoot: "/repo",
+      path: "/repo/new",
+      anchorId: "anchor-1",
+    });
+    const createRequest = JSON.parse(ws.sent[3]) as {
+      id: string;
+      method: string;
+      params: { anchorId?: string; repoRoot: string; path: string };
+    };
+    expect(createRequest.method).toBe("anchor.git.worktree.create");
+    expect(createRequest.params.anchorId).toBe("anchor-1");
+    ws.emitMessage({
+      id: createRequest.id,
+      result: { repoRoot: "/repo", path: "/repo/new", branch: "feature/test", head: "abc123" },
+    });
+    await createPromise;
+
+    const removePromise = socket.gitWorktreeRemove("/repo", "/repo/new", true, "anchor-1");
+    const removeRequest = JSON.parse(ws.sent[4]) as {
+      id: string;
+      method: string;
+      params: { anchorId?: string; repoRoot: string; path: string; force: boolean };
+    };
+    expect(removeRequest.method).toBe("anchor.git.worktree.remove");
+    expect(removeRequest.params.anchorId).toBe("anchor-1");
+    ws.emitMessage({
+      id: removeRequest.id,
+      result: { removed: true },
+    });
+    await removePromise;
+
+    const prunePromise = socket.gitWorktreePrune("/repo", "anchor-1");
+    const pruneRequest = JSON.parse(ws.sent[5]) as {
+      id: string;
+      method: string;
+      params: { anchorId?: string; repoRoot: string };
+    };
+    expect(pruneRequest.method).toBe("anchor.git.worktree.prune");
+    expect(pruneRequest.params.anchorId).toBe("anchor-1");
+    ws.emitMessage({
+      id: pruneRequest.id,
+      result: { prunedCount: 1 },
+    });
+    await prunePromise;
+
+    socket.disconnect();
+  });
+
   test("rejects RPC fallback with key descriptor instead of translated text", async () => {
     const { getSocketErrorMessage, socket } = await loadFreshSocketModule();
     socket.connect("ws://localhost:8788/ws/client");

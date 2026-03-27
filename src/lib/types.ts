@@ -230,6 +230,7 @@ export interface GitWorktreeListResult {
 
 export interface GitWorktreeCreateParams {
   repoRoot: string;
+  anchorId?: string;
   baseRef?: string;
   branchName?: string;
   path?: string;

@@ -3,6 +3,7 @@
   import { socket } from "../socket.svelte";
   import {
     renderWorktreesUiMessage,
+    resolveWorktreeAnchorId,
     toWorktreesUiMessage,
     worktrees,
     type WorktreesUiMessage,
@@ -95,7 +96,12 @@
     browseLoading = true;
     browseError = null;
     try {
-      const result = await socket.listDirs(path, path ? undefined : searchStartPath || undefined);
+      const anchorId = resolveWorktreeAnchorId();
+      const result = await socket.listDirs(
+        path,
+        path ? undefined : searchStartPath || undefined,
+        anchorId ?? undefined,
+      );
       if (requestId !== browseRequestId) return;
       dirs = result.dirs;
       currentPath = result.current;

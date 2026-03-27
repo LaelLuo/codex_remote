@@ -1,4 +1,6 @@
 import type { GitWorktree } from "./types";
+import { anchors } from "./anchors.svelte";
+import { auth } from "./auth.svelte";
 import { getSocketErrorMessage, socket, type SocketErrorMessage } from "./socket.svelte";
 
 const STORE_KEY = "__codex_remote_worktrees_store__";
@@ -24,6 +26,11 @@ export function renderWorktreesUiMessage(
   if (!message) return "";
   if (message.kind === "text") return message.text;
   return translate(message.key, message.params);
+}
+
+export function resolveWorktreeAnchorId(): string | null {
+  if (auth.isLocalMode) return null;
+  return anchors.selectedId;
 }
 
 class WorktreesStore {
@@ -58,7 +65,8 @@ class WorktreesStore {
 
     this.loading = true;
     try {
-      const inspect = await socket.gitInspect(normalized);
+      const anchorId = resolveWorktreeAnchorId();
+      const inspect = await socket.gitInspect(normalized, anchorId ?? undefined);
       if (requestId !== this.#inspectRequestId) return;
       if (!inspect.isGitRepo || !inspect.repoRoot) {
         this.repoRoot = null;
@@ -115,8 +123,10 @@ class WorktreesStore {
       const baseRef = options?.baseRef?.trim();
       const path = options?.path?.trim();
       const rootDir = options?.rootDir?.trim();
+      const anchorId = resolveWorktreeAnchorId();
       const created = await socket.gitWorktreeCreate({
         repoRoot: this.repoRoot,
+        ...(anchorId ? { anchorId } : {}),
         ...(baseRef ? { baseRef } : {}),
         ...(path ? { path } : {}),
         ...(rootDir ? { rootDir } : {}),
@@ -137,7 +147,8 @@ class WorktreesStore {
     this.mutating = true;
     this.error = null;
     try {
-      await socket.gitWorktreeRemove(this.repoRoot, path, force);
+      const anchorId = resolveWorktreeAnchorId();
+      await socket.gitWorktreeRemove(this.repoRoot, path, force, anchorId ?? undefined);
       const fallback = this.repoRoot;
       await this.#loadWorktrees(this.repoRoot, fallback);
       if (!this.worktrees.find((wt) => wt.path === this.selectedWorktreePath)) {
@@ -159,7 +170,8 @@ class WorktreesStore {
     this.mutating = true;
     this.error = null;
     try {
-      const result = await socket.gitWorktreePrune(this.repoRoot);
+      const anchorId = resolveWorktreeAnchorId();
+      const result = await socket.gitWorktreePrune(this.repoRoot, anchorId ?? undefined);
       await this.#loadWorktrees(this.repoRoot, this.selectedWorktreePath || this.projectPath);
       return result.prunedCount;
     } catch (err) {
@@ -171,7 +183,8 @@ class WorktreesStore {
   }
 
   async #loadWorktrees(repoRoot: string, preferredPath: string, requestId?: number) {
-    const result = await socket.gitWorktreeList(repoRoot);
+    const anchorId = resolveWorktreeAnchorId();
+    const result = await socket.gitWorktreeList(repoRoot, anchorId ?? undefined);
     if (requestId != null && requestId !== this.#inspectRequestId) return;
     this.worktrees = result.worktrees;
     const match = this.worktrees.find((wt) => wt.path === preferredPath);
