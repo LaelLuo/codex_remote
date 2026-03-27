@@ -373,7 +373,11 @@ class RelayHub:
             async with self._lock:
                 self.thread_to_anchor_id.setdefault(self._thread_key(user_id, thread_id), state.bound_anchor_id)
 
-        replay_messages = self.db.list_relay_thread_messages(user_id, thread_id, limit=self.REPLAY_LIMIT)
+        replay_messages = [
+            record
+            for record in self.db.list_relay_thread_messages(user_id, thread_id, limit=self.REPLAY_LIMIT)
+            if self._should_replay_raw_message(record.raw_data)
+        ]
         payload: dict[str, Any] = {
             "type": "orbit.relay-state",
             "threadId": thread_id,
@@ -549,12 +553,14 @@ class RelayHub:
         raw_data: str,
         msg: dict[str, Any] | None,
     ) -> None:
-        self.db.append_relay_thread_message(user_id, thread_id, raw_data)
         if anchor_id:
             self.db.set_relay_thread_anchor(user_id, thread_id, anchor_id)
 
         if not msg:
             return
+
+        if self._should_persist_recent_message(msg):
+            self.db.append_relay_thread_message(user_id, thread_id, raw_data)
 
         turn_id, turn_status = self._extract_turn_state(msg)
         if turn_id is not None or turn_status is not None:
@@ -576,6 +582,23 @@ class RelayHub:
                 summary=artifact.summary,
                 payload_json=artifact.payload_json,
             )
+
+    def _should_persist_recent_message(self, msg: dict[str, Any]) -> bool:
+        method = msg.get("method")
+        if not isinstance(method, str):
+            return False
+        return method.startswith("item/") or method.startswith("turn/")
+
+    def _should_replay_raw_message(self, raw_data: str) -> bool:
+        try:
+            message = json.loads(raw_data)
+        except json.JSONDecodeError:
+            return False
+
+        if not isinstance(message, dict):
+            return False
+
+        return self._should_persist_recent_message(message)
 
     def _extract_artifact(
         self,

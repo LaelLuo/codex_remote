@@ -463,6 +463,127 @@ def test_relay_replays_state_and_recent_messages_on_client_resubscribe(tmp_path:
                 assert replayed_delta.get("params", {}).get("delta") == "hello replay"
 
 
+def test_relay_does_not_replay_thread_started_messages(tmp_path: Path, monkeypatch) -> None:
+    client = _make_client(tmp_path, monkeypatch, auth_mode="basic")
+    with client:
+        username = f"user-{uuid.uuid4().hex[:8]}"
+        registered = _register_basic(client, username)
+        anchor_tokens = _issue_anchor_tokens(client, registered["token"])
+        anchor_access = anchor_tokens["anchorAccessToken"]
+
+        with client.websocket_connect(f"/ws/anchor?token={anchor_access}") as anchor_ws:
+            assert anchor_ws.receive_json()["type"] == "orbit.hello"
+            anchor_ws.send_json({"type": "anchor.hello", "hostname": "replay-anchor", "platform": "linux", "anchorId": "replay-anchor"})
+            anchor_ws.send_json({"type": "orbit.subscribe", "threadId": "thread-filtered-replay"})
+            _recv_until(
+                anchor_ws,
+                lambda msg: msg.get("type") == "orbit.subscribed" and msg.get("threadId") == "thread-filtered-replay",
+            )
+
+            with client.websocket_connect(f"/ws/client?token={registered['token']}&clientId=replay-filter-client-a") as client_a_ws:
+                _recv_until(client_a_ws, lambda msg: msg.get("type") == "orbit.hello")
+                client_a_ws.send_json({"type": "orbit.subscribe", "threadId": "thread-filtered-replay"})
+                _recv_until(
+                    client_a_ws,
+                    lambda msg: msg.get("type") == "orbit.subscribed" and msg.get("threadId") == "thread-filtered-replay",
+                )
+                _recv_until(
+                    client_a_ws,
+                    lambda msg: msg.get("type") == "orbit.relay-state" and msg.get("threadId") == "thread-filtered-replay",
+                )
+
+                anchor_ws.send_json(
+                    {
+                        "method": "thread/started",
+                        "params": {
+                            "thread": {
+                                "id": "thread-filtered-replay",
+                                "createdAt": 1,
+                                "updatedAt": 1,
+                                "status": {"type": "idle"},
+                            }
+                        },
+                    }
+                )
+                _recv_until(
+                    client_a_ws,
+                    lambda msg: msg.get("method") == "thread/started"
+                    and msg.get("params", {}).get("thread", {}).get("id") == "thread-filtered-replay",
+                )
+
+                anchor_ws.send_json(
+                    {
+                        "method": "turn/started",
+                        "params": {
+                            "threadId": "thread-filtered-replay",
+                            "turn": {"id": "turn-filtered-replay-1", "status": "InProgress"},
+                        },
+                    }
+                )
+                _recv_until(
+                    client_a_ws,
+                    lambda msg: msg.get("method") == "turn/started"
+                    and msg.get("params", {}).get("threadId") == "thread-filtered-replay",
+                )
+
+            with client.websocket_connect(f"/ws/client?token={registered['token']}&clientId=replay-filter-client-b") as client_b_ws:
+                _recv_until(client_b_ws, lambda msg: msg.get("type") == "orbit.hello")
+                client_b_ws.send_json({"type": "orbit.subscribe", "threadId": "thread-filtered-replay"})
+                _recv_until(
+                    client_b_ws,
+                    lambda msg: msg.get("type") == "orbit.subscribed" and msg.get("threadId") == "thread-filtered-replay",
+                )
+                replay_state = _recv_until(
+                    client_b_ws,
+                    lambda msg: msg.get("type") == "orbit.relay-state" and msg.get("threadId") == "thread-filtered-replay",
+                )
+                assert replay_state.get("boundAnchorId") == "replay-anchor"
+
+                first_replayed = client_b_ws.receive_json()
+                assert first_replayed.get("method") == "turn/started"
+                assert first_replayed.get("params", {}).get("threadId") == "thread-filtered-replay"
+
+
+def test_relay_filters_legacy_thread_started_messages_from_replay(tmp_path: Path, monkeypatch) -> None:
+    client = _make_client(tmp_path, monkeypatch, auth_mode="basic")
+    with client:
+        username = f"user-{uuid.uuid4().hex[:8]}"
+        registered = _register_basic(client, username)
+        app_main = importlib.import_module("app.main")
+        user_id = app_main.db.get_user_by_name(username).id
+
+        app_main.db.set_relay_thread_anchor(user_id, "thread-legacy-filter", "legacy-anchor")
+        app_main.db.append_relay_thread_message(
+            user_id,
+            "thread-legacy-filter",
+            '{"method":"thread/started","params":{"thread":{"id":"thread-legacy-filter"}}}',
+        )
+        app_main.db.append_relay_thread_message(
+            user_id,
+            "thread-legacy-filter",
+            '{"method":"turn/started","params":{"threadId":"thread-legacy-filter","turn":{"id":"turn-legacy-1","status":"InProgress"}}}',
+        )
+        app_main.db.set_relay_thread_turn(user_id, "thread-legacy-filter", "turn-legacy-1", "InProgress")
+
+        with client.websocket_connect(f"/ws/client?token={registered['token']}&clientId=legacy-filter-client") as client_ws:
+            _recv_until(client_ws, lambda msg: msg.get("type") == "orbit.hello")
+            client_ws.send_json({"type": "orbit.subscribe", "threadId": "thread-legacy-filter"})
+            _recv_until(
+                client_ws,
+                lambda msg: msg.get("type") == "orbit.subscribed" and msg.get("threadId") == "thread-legacy-filter",
+            )
+            replay_state = _recv_until(
+                client_ws,
+                lambda msg: msg.get("type") == "orbit.relay-state" and msg.get("threadId") == "thread-legacy-filter",
+            )
+            assert replay_state.get("boundAnchorId") == "legacy-anchor"
+            assert replay_state.get("turn", {}).get("id") == "turn-legacy-1"
+
+            first_replayed = client_ws.receive_json()
+            assert first_replayed.get("method") == "turn/started"
+            assert first_replayed.get("params", {}).get("threadId") == "thread-legacy-filter"
+
+
 def test_relay_artifacts_list_via_ws_and_http(tmp_path: Path, monkeypatch) -> None:
     client = _make_client(tmp_path, monkeypatch, auth_mode="basic")
     with client:
