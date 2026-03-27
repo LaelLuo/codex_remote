@@ -8,6 +8,12 @@ import {
   handleAnchorReleaseStart,
   handleAnchorReleaseStatus,
 } from "./release";
+import {
+  formatOrbitCloseSummary,
+  getOrbitReconnectDelayMs,
+  ORBIT_HEARTBEAT_INTERVAL_MS,
+  ORBIT_HEARTBEAT_TIMEOUT_MS,
+} from "./orbit-connection";
 
 const PORT = Number(process.env.ANCHOR_PORT ?? 8788);
 const ORBIT_URL = process.env.ANCHOR_ORBIT_URL ?? "";
@@ -40,6 +46,9 @@ let orbitSocket: WebSocket | null = null;
 let orbitConnecting = false;
 let orbitHeartbeatInterval: ReturnType<typeof setInterval> | null = null;
 let orbitHeartbeatTimeout: ReturnType<typeof setTimeout> | null = null;
+let orbitReconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+let orbitReconnectAttempts = 0;
+let orbitHeartbeatTimedOut = false;
 let warnedNoAppServer = false;
 let appServerInitialized = false;
 const MAX_IMAGE_READ_BYTES = 20 * 1024 * 1024;
@@ -1606,21 +1615,44 @@ function stopOrbitHeartbeat(): void {
   }
 }
 
+function clearOrbitReconnectTimeout(): void {
+  if (orbitReconnectTimeout) {
+    clearTimeout(orbitReconnectTimeout);
+    orbitReconnectTimeout = null;
+  }
+}
+
+function scheduleOrbitReconnect(): void {
+  clearOrbitReconnectTimeout();
+  const delayMs = getOrbitReconnectDelayMs(orbitReconnectAttempts + 1);
+  orbitReconnectAttempts += 1;
+  console.warn(`[anchor] scheduling orbit reconnect in ${delayMs}ms (attempt ${orbitReconnectAttempts})`);
+  orbitReconnectTimeout = setTimeout(() => {
+    orbitReconnectTimeout = null;
+    void connectOrbit();
+  }, delayMs);
+}
+
 function startOrbitHeartbeat(ws: WebSocket): void {
   stopOrbitHeartbeat();
+  orbitHeartbeatTimedOut = false;
   orbitHeartbeatInterval = setInterval(() => {
     if (ws.readyState === WebSocket.OPEN) {
       try {
+        if (orbitHeartbeatTimeout) {
+          clearTimeout(orbitHeartbeatTimeout);
+        }
         ws.send(JSON.stringify({ type: "ping" }));
         orbitHeartbeatTimeout = setTimeout(() => {
-          console.warn("[anchor] heartbeat timeout");
-          ws.close();
-        }, 10_000);
+          orbitHeartbeatTimedOut = true;
+          console.warn(`[anchor] heartbeat timeout after ${ORBIT_HEARTBEAT_TIMEOUT_MS}ms without pong`);
+          ws.close(4000, "Heartbeat timeout");
+        }, ORBIT_HEARTBEAT_TIMEOUT_MS);
       } catch {
         ws.close();
       }
     }
-  }, 30_000);
+  }, ORBIT_HEARTBEAT_INTERVAL_MS);
 }
 
 async function connectOrbit(): Promise<void> {
@@ -1642,6 +1674,8 @@ async function connectOrbit(): Promise<void> {
   ws.addEventListener("open", () => {
     opened = true;
     orbitConnecting = false;
+    orbitReconnectAttempts = 0;
+    clearOrbitReconnectTimeout();
     ws.send(JSON.stringify(buildAnchorHelloPayload()));
     console.log("[anchor] connected to orbit");
     startOrbitHeartbeat(ws);
@@ -1720,20 +1754,29 @@ async function connectOrbit(): Promise<void> {
     }
   });
 
-  ws.addEventListener("close", () => {
+  ws.addEventListener("close", (event) => {
     stopOrbitHeartbeat();
+    const closeSummary = formatOrbitCloseSummary(event);
+    const timedOut = orbitHeartbeatTimedOut;
+    orbitHeartbeatTimedOut = false;
     if (!opened) {
-      console.warn("[anchor] orbit socket closed before handshake completed");
+      console.warn(`[anchor] orbit socket closed before handshake completed (${closeSummary})`);
+    } else {
+      console.warn(
+        `[anchor] orbit socket closed (${closeSummary}${timedOut ? "; source=heartbeat-timeout" : ""})`,
+      );
     }
     orbitSocket = null;
     orbitConnecting = false;
-    setTimeout(() => void connectOrbit(), 2_000);
+    scheduleOrbitReconnect();
   });
 
   ws.addEventListener("error", () => {
     stopOrbitHeartbeat();
     if (!opened) {
-      console.warn("[anchor] orbit socket error during handshake");
+      console.warn(`[anchor] orbit socket error during handshake (readyState=${ws.readyState})`);
+    } else {
+      console.warn(`[anchor] orbit socket error (readyState=${ws.readyState})`);
     }
     orbitSocket = null;
     orbitConnecting = false;
