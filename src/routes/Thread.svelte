@@ -28,6 +28,7 @@
     import PromptInput from "../lib/components/PromptInput.svelte";
     import GitStatusPanel from "../lib/components/GitStatusPanel.svelte";
     import ArtifactsTimeline from "../lib/components/ArtifactsTimeline.svelte";
+    import { buildThreadConsoleStyleVars } from "../lib/thread-layout";
 
     const themeIcons = { system: "◐", light: "○", dark: "●" } as const;
 
@@ -442,7 +443,7 @@
                 </div>
             </header>
 
-            <section class="thread-console stack">
+            <section class="thread-console stack" style={buildThreadConsoleStyleVars()}>
                 <div class="transcript" bind:this={container}>
                     {#if messages.current.length === 0}
                         <div class="empty stack">
@@ -657,7 +658,8 @@
         border-radius: var(--radius-md);
         background: color-mix(in srgb, var(--cli-bg-elevated) 90%, transparent);
         overflow: hidden;
-        min-height: min(68vh, 900px);
+        min-height: var(--thread-console-min-height);
+        max-height: var(--thread-console-max-height);
     }
 
     .thread-shell :global(.artifacts-panel) {
@@ -1040,7 +1042,8 @@
         }
 
         .thread-console {
-            min-height: calc(100vh - 13rem);
+            min-height: var(--thread-console-mobile-min-height);
+            max-height: var(--thread-console-mobile-max-height);
         }
     }
 

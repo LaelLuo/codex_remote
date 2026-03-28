@@ -3,6 +3,7 @@
   import type { ArtifactsUiMessage } from "../artifacts.svelte";
   import type { OrbitArtifact } from "../types";
   import { i18n } from "../i18n.svelte";
+  import { buildArtifactsTimelineStyleVars } from "../thread-layout";
 
   type Props = {
     threadId?: string | null;
@@ -68,7 +69,7 @@
   }
 </script>
 
-<section class="artifacts-panel stack" aria-live="polite">
+<section class="artifacts-panel stack" aria-live="polite" style={buildArtifactsTimelineStyleVars()}>
   <header class="panel-head row">
     <div class="panel-title-wrap stack">
       <span class="panel-kicker">{i18n.t("artifacts.panelKicker")}</span>
@@ -91,39 +92,41 @@
   {:else if artifacts.length === 0}
     <p class="hint">{i18n.t("artifacts.empty")}</p>
   {:else}
-    <ol class="timeline">
-      {#each artifacts as artifact (artifact.id)}
-        <li class="timeline-item stack">
-          <div class="timeline-head row">
-            <span class="artifact-title">{renderArtifactTitle(artifact)}</span>
-            <span class="artifact-ts">{formatTimestamp(artifact.createdAt)}</span>
-          </div>
-          <div class="timeline-meta row">
-            <span class="meta-chip">{renderArtifactType(artifact.type)}</span>
-            {#if artifact.status}
-              <span class="meta-chip status">{renderArtifactStatus(artifact.status)}</span>
+    <div class="timeline-scroll">
+      <ol class="timeline">
+        {#each artifacts as artifact (artifact.id)}
+          <li class="timeline-item stack">
+            <div class="timeline-head row">
+              <span class="artifact-title">{renderArtifactTitle(artifact)}</span>
+              <span class="artifact-ts">{formatTimestamp(artifact.createdAt)}</span>
+            </div>
+            <div class="timeline-meta row">
+              <span class="meta-chip">{renderArtifactType(artifact.type)}</span>
+              {#if artifact.status}
+                <span class="meta-chip status">{renderArtifactStatus(artifact.status)}</span>
+              {/if}
+            </div>
+            {#if artifactPaths(artifact).length > 0}
+              <div class="artifact-paths row">
+                {#each artifactPaths(artifact) as path (path)}
+                  <code class="path-chip">{path}</code>
+                {/each}
+              </div>
             {/if}
-          </div>
-          {#if artifactPaths(artifact).length > 0}
-            <div class="artifact-paths row">
-              {#each artifactPaths(artifact) as path (path)}
-                <code class="path-chip">{path}</code>
-              {/each}
-            </div>
-          {/if}
-          {#if artifact.summary}
-            <p class="artifact-summary">{artifact.summary}</p>
-          {/if}
-          {#if artifact.links?.length}
-            <div class="artifact-links row">
-              {#each artifact.links as link (link.href)}
-                <a href={link.href} target="_blank" rel="noreferrer">{link.label}</a>
-              {/each}
-            </div>
-          {/if}
-        </li>
-      {/each}
-    </ol>
+            {#if artifact.summary}
+              <p class="artifact-summary">{artifact.summary}</p>
+            {/if}
+            {#if artifact.links?.length}
+              <div class="artifact-links row">
+                {#each artifact.links as link (link.href)}
+                  <a href={link.href} target="_blank" rel="noreferrer">{link.label}</a>
+                {/each}
+              </div>
+            {/if}
+          </li>
+        {/each}
+      </ol>
+    </div>
   {/if}
 </section>
 
@@ -201,6 +204,12 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-sm);
+  }
+
+  .timeline-scroll {
+    overflow-y: auto;
+    max-height: var(--artifacts-timeline-max-height);
+    padding-right: 0.1rem;
   }
 
   .timeline-item {
@@ -310,5 +319,11 @@
 
   .hint-error {
     color: var(--cli-error);
+  }
+
+  @media (max-width: 900px) {
+    .timeline-scroll {
+      max-height: var(--artifacts-timeline-mobile-max-height);
+    }
   }
 </style>
