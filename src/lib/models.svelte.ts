@@ -2,6 +2,12 @@ import type { ModelOption, ReasoningEffort, RpcMessage } from "./types";
 import { socket } from "./socket.svelte";
 import { anchors } from "./anchors.svelte";
 import { auth } from "./auth.svelte";
+import {
+  parseCodexConfigModelDefaults,
+  pickDefaultModelOption,
+  resolveReasoningEffortForModel,
+  type CodexConfigModelDefaults,
+} from "./model-defaults";
 
 type FetchStatus = "idle" | "loading" | "success" | "error";
 const MODEL_LIST_TIMEOUT_MS = 12_000;
@@ -9,8 +15,9 @@ const MODEL_LIST_TIMEOUT_MS = 12_000;
 class ModelsStore {
   options = $state<ModelOption[]>([]);
   status = $state<FetchStatus>("idle");
+  configDefaults = $state<CodexConfigModelDefaults>({ model: null, reasoningEffort: null });
   defaultModel = $derived(
-    this.options.find((option) => option.isDefault) ?? this.options[0] ?? null
+    pickDefaultModelOption(this.options, this.configDefaults.model)
   );
 
   #requestId: number | null = null;
@@ -34,6 +41,7 @@ class ModelsStore {
   /** Fetch models if we haven't already */
   fetch() {
     if (this.status !== "idle") return;
+    void this.#refreshConfigDefaults();
     this.#send();
   }
 
@@ -42,6 +50,15 @@ class ModelsStore {
     this.#clearPendingRequest();
     this.status = "idle";
     this.#send();
+    void this.#refreshConfigDefaults();
+  }
+
+  resolveDefaultReasoningEffort(modelValue?: string | null): ReasoningEffort {
+    return resolveReasoningEffortForModel(this.options, {
+      selectedModel: modelValue ?? "",
+      preferredModel: this.configDefaults.model,
+      preferredReasoningEffort: this.configDefaults.reasoningEffort,
+    });
   }
 
   #send() {
@@ -56,6 +73,24 @@ class ModelsStore {
       id: this.#requestId,
       params: !auth.isLocalMode && anchors.selectedId ? { anchorId: anchors.selectedId } : {},
     });
+  }
+
+  async #refreshConfigDefaults() {
+    if (socket.status !== "connected") return;
+    if (!auth.isLocalMode && !anchors.selectedId) {
+      this.configDefaults = { model: null, reasoningEffort: null };
+      return;
+    }
+
+    try {
+      const result = await socket.readCodexConfig(
+        undefined,
+        !auth.isLocalMode ? anchors.selectedId ?? undefined : undefined,
+      );
+      this.configDefaults = parseCodexConfigModelDefaults(result.content);
+    } catch {
+      this.configDefaults = { model: null, reasoningEffort: null };
+    }
   }
 
   #handleMessage(msg: RpcMessage) {

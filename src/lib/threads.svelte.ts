@@ -10,12 +10,15 @@ const STORE_KEY = "__codex_remote_threads_store__";
 const SETTINGS_STORAGE_KEY = "codex_remote_thread_settings";
 const PROJECTS_STORAGE_KEY = "codex_remote_thread_projects";
 
-const DEFAULT_SETTINGS: ThreadSettings = {
-  model: "",
-  reasoningEffort: "medium",
-  sandbox: "workspace-write",
-  mode: "code",
-};
+function createDefaultSettings(): ThreadSettings {
+  const defaultModel = models.defaultModel?.value ?? "";
+  return {
+    model: defaultModel,
+    reasoningEffort: models.resolveDefaultReasoningEffort(defaultModel),
+    sandbox: "workspace-write",
+    mode: "code",
+  };
+}
 
 export type ThreadStartMessage =
   | { kind: "key"; key: string; params?: Record<string, string | number> }
@@ -64,13 +67,13 @@ class ThreadsStore {
   }
 
   getSettings(threadId: string | null): ThreadSettings {
-    if (!threadId) return { ...DEFAULT_SETTINGS };
+    if (!threadId) return createDefaultSettings();
     const settings = this.#settings.get(threadId);
-    return settings ? { ...settings } : { ...DEFAULT_SETTINGS };
+    return settings ? { ...settings } : createDefaultSettings();
   }
 
   updateSettings(threadId: string, update: Partial<ThreadSettings>) {
-    const current = this.#settings.get(threadId) ?? DEFAULT_SETTINGS;
+    const current = this.#settings.get(threadId) ?? createDefaultSettings();
     const next: ThreadSettings = { ...current, ...update };
     if (
       current.model === next.model &&
@@ -249,7 +252,9 @@ class ThreadsStore {
           const sandbox = this.#normalizeSandbox(result.sandbox);
           this.updateSettings(thread.id, {
             model: result.model ?? pending?.model ?? "",
-            reasoningEffort: result.reasoningEffort ?? DEFAULT_SETTINGS.reasoningEffort,
+            reasoningEffort:
+              result.reasoningEffort ??
+              models.resolveDefaultReasoningEffort(result.model ?? pending?.model ?? null),
             ...(sandbox ? { sandbox } : {}),
           });
 
@@ -452,7 +457,7 @@ class ThreadsStore {
       const next = new Map<string, ThreadSettings>();
       for (const [threadId, settings] of Object.entries(data)) {
         if (!threadId) continue;
-        next.set(threadId, { ...DEFAULT_SETTINGS, ...settings });
+        next.set(threadId, { ...createDefaultSettings(), ...settings });
       }
       this.#settings = next;
     } catch {

@@ -155,7 +155,11 @@
   function resolvePaneCollaborationMode(pane: ComposerPane) {
     const effectiveModel = pane.selectedModel.trim() || models.defaultModel?.value?.trim() || "";
     if (!effectiveModel) return undefined;
-    return threads.resolveCollaborationMode(pane.mode, effectiveModel, "medium");
+    return threads.resolveCollaborationMode(
+      pane.mode,
+      effectiveModel,
+      models.resolveDefaultReasoningEffort(effectiveModel),
+    );
   }
 
   function lastPlanIdForPane(pane: ComposerPane): string | null {
@@ -208,7 +212,7 @@
       params.model = effectiveModel;
       params.collaborationMode = resolvePaneCollaborationMode(pane);
     }
-    params.effort = "medium";
+    params.effort = models.resolveDefaultReasoningEffort(effectiveModel);
 
     const result = socket.send({
       method: "turn/start",
@@ -506,7 +510,11 @@
     try {
       const effectiveModel = pane.selectedModel.trim() || models.defaultModel?.value?.trim() || "";
       const collaborationMode = effectiveModel
-        ? threads.resolveCollaborationMode(pane.mode, effectiveModel, "medium")
+        ? threads.resolveCollaborationMode(
+            pane.mode,
+            effectiveModel,
+            models.resolveDefaultReasoningEffort(effectiveModel),
+          )
         : undefined;
 
       const hasStartImages = pane.taskAttachments.length > 0;

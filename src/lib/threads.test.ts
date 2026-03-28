@@ -20,6 +20,7 @@ const messagesMock = {
 
 const modelsMock = {
   defaultModel: { value: "gpt-test" },
+  resolveDefaultReasoningEffort: mock(() => "high"),
 };
 
 const anchorsMock: {
@@ -256,5 +257,30 @@ describe("threads start errors", () => {
       kind: "text",
       text: "backend exploded",
     });
+  });
+});
+
+describe("threads default settings", () => {
+  test("uses resolved default reasoning effort when start response omits it", async () => {
+    anchorsMock.list = [{ id: "anchor-1" }];
+    anchorsMock.selectedId = "anchor-1";
+    anchorsMock.selected = { id: "anchor-1" };
+
+    const { threads } = await loadFreshThreadsModule();
+
+    threads.start("C:/repo", "task");
+
+    const startRequest = socketSendMock.mock.calls[0]?.[0] as { id: number } | undefined;
+    expect(startRequest?.id).toBeDefined();
+
+    threads.handleMessage({
+      id: startRequest!.id,
+      result: {
+        thread: { id: "thread-1" },
+      },
+    });
+
+    expect(modelsMock.resolveDefaultReasoningEffort).toHaveBeenCalledWith("gpt-test");
+    expect(threads.getSettings("thread-1").reasoningEffort).toBe("high");
   });
 });
