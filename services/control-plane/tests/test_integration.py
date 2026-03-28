@@ -584,6 +584,74 @@ def test_relay_filters_legacy_thread_started_messages_from_replay(tmp_path: Path
             assert first_replayed.get("params", {}).get("threadId") == "thread-legacy-filter"
 
 
+def test_anchor_disconnect_marks_inflight_turn_interrupted_for_clients_and_replay(tmp_path: Path, monkeypatch) -> None:
+    client = _make_client(tmp_path, monkeypatch, auth_mode="basic")
+    with client:
+        username = f"user-{uuid.uuid4().hex[:8]}"
+        registered = _register_basic(client, username)
+        anchor_tokens = _issue_anchor_tokens(client, registered["token"])
+        anchor_access = anchor_tokens["anchorAccessToken"]
+
+        with client.websocket_connect(f"/ws/anchor?token={anchor_access}") as anchor_ws:
+            assert anchor_ws.receive_json()["type"] == "orbit.hello"
+            anchor_ws.send_json({"type": "anchor.hello", "hostname": "disconnect-anchor", "platform": "linux", "anchorId": "disconnect-anchor"})
+            anchor_ws.send_json({"type": "orbit.subscribe", "threadId": "thread-disconnect"})
+            _recv_until(
+                anchor_ws,
+                lambda msg: msg.get("type") == "orbit.subscribed" and msg.get("threadId") == "thread-disconnect",
+            )
+
+            with client.websocket_connect(f"/ws/client?token={registered['token']}&clientId=disconnect-client-a") as client_a_ws:
+                _recv_until(client_a_ws, lambda msg: msg.get("type") == "orbit.hello")
+                client_a_ws.send_json({"type": "orbit.subscribe", "threadId": "thread-disconnect"})
+                _recv_until(
+                    client_a_ws,
+                    lambda msg: msg.get("type") == "orbit.subscribed" and msg.get("threadId") == "thread-disconnect",
+                )
+                _recv_until(
+                    client_a_ws,
+                    lambda msg: msg.get("type") == "orbit.relay-state" and msg.get("threadId") == "thread-disconnect",
+                )
+
+                anchor_ws.send_json(
+                    {
+                        "method": "turn/started",
+                        "params": {
+                            "threadId": "thread-disconnect",
+                            "turn": {"id": "turn-disconnect-1", "status": "InProgress"},
+                        },
+                    }
+                )
+                _recv_until(
+                    client_a_ws,
+                    lambda msg: msg.get("method") == "turn/started"
+                    and msg.get("params", {}).get("threadId") == "thread-disconnect",
+                )
+
+            anchor_ws.close()
+
+        with client.websocket_connect(f"/ws/client?token={registered['token']}&clientId=disconnect-client-b") as client_b_ws:
+            _recv_until(client_b_ws, lambda msg: msg.get("type") == "orbit.hello")
+            client_b_ws.send_json({"type": "orbit.subscribe", "threadId": "thread-disconnect"})
+            _recv_until(
+                client_b_ws,
+                lambda msg: msg.get("type") == "orbit.subscribed" and msg.get("threadId") == "thread-disconnect",
+            )
+            replay_state = _recv_until(
+                client_b_ws,
+                lambda msg: msg.get("type") == "orbit.relay-state" and msg.get("threadId") == "thread-disconnect",
+            )
+            assert replay_state.get("boundAnchorId") is None
+            assert replay_state.get("turn", {}).get("status") == "Interrupted"
+
+            replayed_terminal = _recv_until(
+                client_b_ws,
+                lambda msg: msg.get("method") == "turn/interrupted"
+                and msg.get("params", {}).get("threadId") == "thread-disconnect",
+            )
+            assert replayed_terminal.get("params", {}).get("turn", {}).get("id") == "turn-disconnect-1"
+
+
 def test_relay_artifacts_list_via_ws_and_http(tmp_path: Path, monkeypatch) -> None:
     client = _make_client(tmp_path, monkeypatch, auth_mode="basic")
     with client:

@@ -358,6 +358,42 @@ export class OrbitRelay {
         if (this.anchorIdToSocket.get(anchorId) === socket) {
           this.anchorIdToSocket.delete(anchorId);
         }
+
+        const staleThreadIds = Array.from(this.threadToAnchorId.entries())
+          .filter(([, boundAnchorId]) => boundAnchorId === anchorId)
+          .map(([threadId]) => threadId);
+        for (const threadId of staleThreadIds) {
+          this.threadToAnchorId.delete(threadId);
+          const state = this.threadStateById.get(threadId);
+          if ((state?.turn.status ?? "").toLowerCase() === "inprogress") {
+            const payload = JSON.stringify({
+              method: "turn/interrupted",
+              params: {
+                threadId,
+                turn: {
+                  ...(state?.turn.id ? { id: state.turn.id } : {}),
+                  status: "Interrupted",
+                },
+              },
+            });
+            this.applyThreadStateMutationAndPersist({
+              threadId,
+              anchorId: null,
+              ...(state?.turn.id ? { turnId: state.turn.id } : {}),
+              turnStatus: "Interrupted",
+              recentMessage: payload,
+            });
+            const clients = Array.from(this.threadToClients.get(threadId) ?? []);
+            for (const clientSocket of clients) {
+              this.sendToSocket(clientSocket, payload);
+            }
+            continue;
+          }
+          this.applyThreadStateMutationAndPersist({
+            threadId,
+            anchorId: null,
+          });
+        }
       }
 
       const meta = this.anchorMeta.get(socket);
@@ -970,6 +1006,7 @@ export class OrbitRelay {
     if (normalized === "completed") method = "turn/completed";
     if (normalized === "failed") method = "turn/failed";
     if (normalized === "cancelled") method = "turn/cancelled";
+    if (normalized === "interrupted") method = "turn/interrupted";
     if (!method) return;
 
     this.sendJson(socket, {

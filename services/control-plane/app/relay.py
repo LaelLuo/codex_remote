@@ -726,7 +726,7 @@ class RelayHub:
 
     def _extract_turn_state(self, msg: dict[str, Any]) -> tuple[str | None, str | None]:
         method = msg.get("method")
-        if method not in {"turn/started", "turn/completed"}:
+        if method not in {"turn/started", "turn/completed", "turn/failed", "turn/cancelled", "turn/interrupted"}:
             return None, None
 
         params = msg.get("params")
@@ -748,6 +748,18 @@ class RelayHub:
             turn_status = params["status"].strip()
 
         return turn_id, turn_status
+
+    def _build_interrupted_turn_payload(self, thread_id: str, turn_id: str | None) -> dict[str, Any]:
+        turn: dict[str, Any] = {"status": "Interrupted"}
+        if turn_id:
+            turn["id"] = turn_id
+        return {
+            "method": "turn/interrupted",
+            "params": {
+                "threadId": thread_id,
+                "turn": turn,
+            },
+        }
 
     def _extract_turn_id(self, msg: dict[str, Any], item: dict[str, Any]) -> str | None:
         params = msg.get("params")
@@ -978,6 +990,14 @@ class RelayHub:
                     if thread_key[0] == user_id and bound_anchor_id == anchor_id
                 ]
                 for thread_key in stale_thread_keys:
+                    state = self.db.get_relay_thread_state(user_id, thread_key[1])
+                    if state and (state.turn_status or "").lower() == "inprogress":
+                        payload = self._build_interrupted_turn_payload(thread_key[1], state.turn_id)
+                        self.db.set_relay_thread_turn(user_id, thread_key[1], state.turn_id, "Interrupted")
+                        self.db.append_relay_thread_message(user_id, thread_key[1], json.dumps(payload))
+                        clients = list(self.thread_to_clients.get(thread_key, set()))
+                        if clients:
+                            notifications.append(BroadcastNotification(sockets=clients, payload=payload))
                     self.thread_to_anchor_id.pop(thread_key, None)
                     self.db.set_relay_thread_anchor(user_id, thread_key[1], None)
 

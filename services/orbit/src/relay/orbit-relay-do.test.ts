@@ -222,4 +222,81 @@ describe("orbit relay routing", () => {
     expect((result?.summary as { ok: number })?.ok).toBe(1);
     expect((result?.summary as { failed: number })?.failed).toBe(1);
   });
+
+  test("marks in-flight turn interrupted when anchor disconnects and replays terminal state", async () => {
+    const relay = createRelayWithStorage(new MockStorage());
+    await (relay as unknown as { storageReady: Promise<void> }).storageReady;
+
+    const relayAny = relay as unknown as {
+      threadStateById: Map<string, unknown>;
+      threadToAnchorId: Map<string, string>;
+      threadToClients: Map<string, Set<WebSocket>>;
+      clientSockets: Map<WebSocket, Set<string>>;
+      anchorMeta: Map<WebSocket, { id: string; hostname: string; platform: string; connectedAt: string }>;
+      anchorIdToSocket: Map<string, WebSocket>;
+      socketToAnchorId: Map<WebSocket, string>;
+      anchorSockets: Map<WebSocket, Set<string>>;
+      removeSocket: (socket: WebSocket, role: "client" | "anchor") => void;
+      handleSubscription: (socket: WebSocket, role: "client" | "anchor", msg: Record<string, unknown>) => boolean;
+    };
+
+    const anchor = new FakeSocket();
+    const clientA = new FakeSocket();
+    const clientB = new FakeSocket();
+    const now = new Date().toISOString();
+
+    relayAny.threadStateById.set("thread-live", {
+      threadId: "thread-live",
+      anchorId: "anchor-live",
+      turn: {
+        id: "turn-live-1",
+        status: "InProgress",
+        updatedAt: now,
+      },
+      recentMessages: [
+        JSON.stringify({
+          method: "turn/started",
+          params: {
+            threadId: "thread-live",
+            turn: { id: "turn-live-1", status: "InProgress" },
+          },
+        }),
+      ],
+      artifacts: [],
+      updatedAt: now,
+    });
+    relayAny.threadToAnchorId.set("thread-live", "anchor-live");
+    relayAny.threadToClients.set("thread-live", new Set([clientA as unknown as WebSocket]));
+    relayAny.clientSockets.set(clientA as unknown as WebSocket, new Set(["thread-live"]));
+    relayAny.anchorMeta.set(anchor as unknown as WebSocket, {
+      id: "anchor-live",
+      hostname: "anchor",
+      platform: "linux",
+      connectedAt: now,
+    });
+    relayAny.anchorIdToSocket.set("anchor-live", anchor as unknown as WebSocket);
+    relayAny.socketToAnchorId.set(anchor as unknown as WebSocket, "anchor-live");
+    relayAny.anchorSockets.set(anchor as unknown as WebSocket, new Set(["thread-live"]));
+
+    relayAny.removeSocket(anchor as unknown as WebSocket, "anchor");
+
+    const broadcastPayloads = parseSent(clientA);
+    const interrupted = broadcastPayloads.find((entry) => entry.method === "turn/interrupted");
+    expect(interrupted).toBeDefined();
+    expect(interrupted?.params).toEqual({
+      threadId: "thread-live",
+      turn: { id: "turn-live-1", status: "Interrupted" },
+    });
+
+    relayAny.clientSockets.set(clientB as unknown as WebSocket, new Set());
+    const handled = relayAny.handleSubscription(clientB as unknown as WebSocket, "client", {
+      type: "orbit.subscribe",
+      threadId: "thread-live",
+    });
+
+    expect(handled).toBe(true);
+    const replayPayloads = parseSent(clientB);
+    expect(replayPayloads[0]?.type).toBe("orbit.subscribed");
+    expect(replayPayloads[1]?.method).toBe("turn/interrupted");
+  });
 });

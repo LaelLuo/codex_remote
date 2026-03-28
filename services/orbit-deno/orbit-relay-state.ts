@@ -221,7 +221,7 @@ export function buildMultiDispatchAggregate(
 }
 
 function isTerminalMethod(method: string): boolean {
-  return method === "turn/completed" || method === "turn/failed" || method === "turn/cancelled";
+  return method === "turn/completed" || method === "turn/failed" || method === "turn/cancelled" || method === "turn/interrupted";
 }
 
 function inferTurnStatus(message: Record<string, unknown>): string | null {
@@ -244,6 +244,7 @@ function inferTurnStatus(message: Record<string, unknown>): string | null {
   if (method === "turn/completed") return "Completed";
   if (method === "turn/failed") return "Failed";
   if (method === "turn/cancelled") return "Cancelled";
+  if (method === "turn/interrupted") return "Interrupted";
   return null;
 }
 
