@@ -105,13 +105,15 @@ class AnchorsStore {
       return;
     }
 
-    if (this.list.length === 1) {
-      this.#setSelectedId(this.list[0].id, true);
+    if (this.selectedId) {
+      if (this.list.length === 0) {
+        this.#setSelectedId(null, true);
+      }
       return;
     }
 
-    if (this.selectedId) {
-      this.#setSelectedId(null, true);
+    if (this.list.length === 1) {
+      this.#setSelectedId(this.list[0].id, true);
     }
   }
 
