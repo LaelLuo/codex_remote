@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { marked } from "marked";
-  import DOMPurify from "dompurify";
   import type { Message } from "../types";
   import { MAX_MARKDOWN_RENDER_CHARS } from "../message-limits";
+  import { mermaidEnhancer } from "../markdown/mermaid-enhancer";
+  import { renderMarkdown } from "../markdown/render-markdown";
   import { i18n } from "../i18n.svelte";
   import ShimmerDot from "./ShimmerDot.svelte";
   import Reasoning from "./Reasoning.svelte";
@@ -48,12 +48,7 @@
 
   const renderedMarkdown = $derived.by(() => {
     if (renderPlainText) return "";
-    return DOMPurify.sanitize(
-      marked.parse(message.text, {
-        async: false,
-        breaks: true,
-      }) as string,
-    );
+    return renderMarkdown(message.text);
   });
 </script>
 
@@ -95,7 +90,7 @@
       {#if renderPlainText}
         <div class="text">{message.text}</div>
       {:else}
-        <div class="text md-text">{@html renderedMarkdown}</div>
+        <div class="text md-text" use:mermaidEnhancer={renderedMarkdown}>{@html renderedMarkdown}</div>
       {/if}
     </div>
   {/if}
@@ -207,6 +202,17 @@
   .md-text :global(pre code) {
     background: transparent;
     padding: 0;
+  }
+
+  .md-text :global(.md-mermaid) {
+    margin: 0.35rem 0;
+    overflow-x: auto;
+  }
+
+  .md-text :global(.md-mermaid svg) {
+    display: block;
+    max-width: 100%;
+    height: auto;
   }
 
   .text.dim {

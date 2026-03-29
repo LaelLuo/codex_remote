@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { marked } from "marked";
-  import DOMPurify from "dompurify";
   import { untrack } from "svelte";
+  import { mermaidEnhancer } from "../markdown/mermaid-enhancer";
+  import { renderMarkdown } from "../markdown/render-markdown";
   import { i18n } from "../i18n.svelte";
   import ShimmerText from "./ShimmerText.svelte";
 
@@ -44,14 +44,7 @@
     isOpen = !isOpen;
   }
 
-  const renderedHtml = $derived.by(() =>
-    DOMPurify.sanitize(
-      marked.parse(content, {
-        async: false,
-        breaks: true,
-      }) as string,
-    ),
-  );
+  const renderedHtml = $derived.by(() => renderMarkdown(content));
 </script>
 
 <div class="reasoning">
@@ -90,7 +83,7 @@
 
   {#if isOpen}
     <div class="reasoning-content">
-      <div class="reasoning-text markdown-content">{@html renderedHtml}</div>
+      <div class="reasoning-text markdown-content" use:mermaidEnhancer={renderedHtml}>{@html renderedHtml}</div>
     </div>
   {/if}
 </div>
@@ -204,6 +197,17 @@
   .markdown-content :global(pre code) {
     background: transparent;
     padding: 0;
+  }
+
+  .markdown-content :global(.md-mermaid) {
+    margin: 0.35rem 0;
+    overflow-x: auto;
+  }
+
+  .markdown-content :global(.md-mermaid svg) {
+    display: block;
+    max-width: 100%;
+    height: auto;
   }
 
   @keyframes slideIn {

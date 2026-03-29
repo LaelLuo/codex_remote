@@ -820,6 +820,16 @@
         line-height: 1.5;
     }
 
+    .thread-page :global(.md-mermaid) {
+        overflow-x: auto;
+    }
+
+    .thread-page :global(.md-mermaid svg) {
+        display: block;
+        max-width: 100%;
+        height: auto;
+    }
+
     .thread-page :global(.prompt-input) {
         padding: 0.1rem var(--space-md) 0.26rem;
     }

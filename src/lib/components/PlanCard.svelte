@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { marked } from "marked";
-  import DOMPurify from "dompurify";
   import type { Message } from "../types";
+  import { mermaidEnhancer } from "../markdown/mermaid-enhancer";
+  import { renderMarkdown } from "../markdown/render-markdown";
   import { i18n } from "../i18n.svelte";
 
   interface Props {
@@ -20,7 +20,7 @@
   const resolved = $derived(!latest || status === "approved");
 
   const planText = $derived(message.text.replace(/<\/?proposed_plan>/g, "").trim());
-  const renderedHtml = $derived(DOMPurify.sanitize(marked.parse(planText, { async: false }) as string));
+  const renderedHtml = $derived(renderMarkdown(planText, { breaks: false }));
 
   function handleApprove() {
     if (disabled) return;
@@ -65,7 +65,7 @@
 
   {#if isOpen}
     <div class="card-body">
-      <div class="plan-text">{@html renderedHtml}</div>
+      <div class="plan-text" use:mermaidEnhancer={renderedHtml}>{@html renderedHtml}</div>
     </div>
   {/if}
 
@@ -215,6 +215,17 @@
   .plan-text :global(pre code) {
     padding: 0;
     background: transparent;
+  }
+
+  .plan-text :global(.md-mermaid) {
+    margin: 0.4em 0;
+    overflow-x: auto;
+  }
+
+  .plan-text :global(.md-mermaid svg) {
+    display: block;
+    max-width: 100%;
+    height: auto;
   }
 
   .plan-text :global(strong) {
