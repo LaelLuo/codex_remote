@@ -1,9 +1,9 @@
 id: TASK-1774765701514-Markdown-Mermaid-图表渲染支持
 title: Markdown Mermaid 图表渲染支持
 status: review
-archived: false
+archived: true
 created_at: '2026-03-29T06:28:21.514Z'
-updated_at: '2026-03-29T07:01:35.820Z'
+updated_at: '2026-03-29T08:38:02.467Z'
 related_repos: []
 depends_on: []
 blocked_by: []
