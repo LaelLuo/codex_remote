@@ -1,3 +1,4 @@
+import { accessSync, constants, statSync } from "node:fs";
 import { hostname, homedir } from "node:os";
 import { access, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
@@ -14,6 +15,10 @@ import {
   ORBIT_HEARTBEAT_INTERVAL_MS,
   ORBIT_HEARTBEAT_TIMEOUT_MS,
 } from "./orbit-connection";
+import {
+  getConfiguredCodexExecutablePath,
+  resolveCodexExecutable,
+} from "./codex-executable";
 
 const PORT = Number(process.env.ANCHOR_PORT ?? 8788);
 const ORBIT_URL = process.env.ANCHOR_ORBIT_URL ?? "";
@@ -23,6 +28,8 @@ const FORCE_LOGIN = process.env.CODEX_REMOTE_FORCE_LOGIN === "1";
 const CREDENTIALS_FILE = (process.env.CODEX_REMOTE_CREDENTIALS_FILE ?? "").trim() || join(homedir(), ".codex-remote", "credentials.json");
 const ANCHOR_WS_TOKEN = (process.env.ANCHOR_WS_TOKEN ?? "").trim();
 const ANCHOR_WS_ALLOW_PUBLIC = process.env.ANCHOR_WS_ALLOW_PUBLIC === "1";
+const CONFIGURED_CODEX_EXECUTABLE = getConfiguredCodexExecutablePath(process.env.CODEX_REMOTE_CODEX_PATH);
+const CODEX_EXECUTABLE = resolveCodexExecutable(process.env.CODEX_REMOTE_CODEX_PATH);
 const startedAt = Date.now();
 
 let CODEX_REMOTE_ANCHOR_JWT_SECRET =
@@ -847,11 +854,27 @@ async function maybeHandleAnchorLocalRpc(message: JsonObject): Promise<JsonObjec
 
 function ensureAppServer(): void {
   if (appServer || appServerStarting) return;
+
+  if (CONFIGURED_CODEX_EXECUTABLE) {
+    try {
+      if (!statSync(CONFIGURED_CODEX_EXECUTABLE).isFile()) {
+        console.error(`[anchor] configured Codex executable is not a file: ${CONFIGURED_CODEX_EXECUTABLE}`);
+        return;
+      }
+      if (process.platform !== "win32") {
+        accessSync(CONFIGURED_CODEX_EXECUTABLE, constants.X_OK);
+      }
+    } catch {
+      console.error(`[anchor] configured Codex executable is not runnable: ${CONFIGURED_CODEX_EXECUTABLE}`);
+      return;
+    }
+  }
+
   appServerStarting = true;
 
   try {
     appServer = Bun.spawn({
-      cmd: ["codex", "app-server"],
+      cmd: [CODEX_EXECUTABLE, "app-server"],
       stdin: "pipe",
       stdout: "pipe",
       stderr: "pipe",
@@ -909,7 +932,7 @@ function ensureAppServer(): void {
       console.error(`[app-server] ${line}`);
     });
   } catch (err) {
-    console.error("[anchor] failed to start codex app-server", err);
+    console.error(`[anchor] failed to start codex app-server via ${CODEX_EXECUTABLE}`, err);
     appServer = null;
   } finally {
     appServerStarting = false;

@@ -56,6 +56,7 @@ function Get-DefaultEnvContent() {
     "DENO_WEB_JWT_SECRET="
     "DENO_ANCHOR_JWT_SECRET="
     "CODEX_REMOTE_ANCHOR_JWT_SECRET="
+    "CODEX_REMOTE_CODEX_PATH="
     "ANCHOR_PORT=8788"
     "ANCHOR_ORBIT_URL="
     "AUTH_URL="
@@ -169,7 +170,7 @@ function Read-EnvFileMap([string]$Path) {
     if (-not $key) {
       continue
     }
-    $value = [string]$trimmed.Substring($idx + 1)
+    $value = [string]$trimmed.Substring($idx + 1).Trim()
     if (($value.StartsWith('"') -and $value.EndsWith('"')) -or ($value.StartsWith("'") -and $value.EndsWith("'"))) {
       if ($value.Length -ge 2) {
         $value = $value.Substring(1, $value.Length - 2)
@@ -194,16 +195,20 @@ function Assert-AnchorRuntime() {
 }
 
 function Get-EnvValue([string]$Name, [string]$DefaultValue = "") {
-  if (-not (Test-Path $script:EnvFile)) {
+  $envVars = Read-EnvFileMap $script:EnvFile
+  if (-not $envVars.ContainsKey($Name)) {
     return $DefaultValue
   }
 
-  $line = Get-Content $script:EnvFile | Where-Object { $_ -match "^\s*$Name=(.*)$" } | Select-Object -Last 1
-  if (-not $line) {
-    return $DefaultValue
+  return [string]$envVars[$Name]
+}
+
+function Test-ExecutableCommand([string]$Path) {
+  if (-not (Test-Path $Path -PathType Leaf)) {
+    return $false
   }
 
-  return ($line -replace "^\s*$Name=", "").Trim()
+  return $null -ne (Get-Command $Path -ErrorAction SilentlyContinue)
 }
 
 function Update-DatabaseIdToml([string]$TomlPath, [string]$DatabaseId) {
@@ -331,6 +336,8 @@ function Cmd-Login() {
 }
 
 function Cmd-Doctor() {
+  Ensure-EnvFile
+
   Write-Host ""
   Write-Host "Codex Remote Doctor" -ForegroundColor Cyan
   Write-Host ""
@@ -367,7 +374,21 @@ function Cmd-Doctor() {
     }
   }
 
-  if (Test-Tool "codex") {
+  $configuredCodexPath = Get-EnvValue "CODEX_REMOTE_CODEX_PATH"
+  if ($configuredCodexPath) {
+    if (Test-ExecutableCommand $configuredCodexPath) {
+      Write-Pass "Codex executable configured ($configuredCodexPath)"
+    }
+    elseif (Test-Path $configuredCodexPath) {
+      Write-Fail "Configured Codex executable is not runnable ($configuredCodexPath)"
+      $hasError = $true
+    }
+    else {
+      Write-Fail "Configured Codex executable not found ($configuredCodexPath)"
+      $hasError = $true
+    }
+  }
+  elseif (Test-Tool "codex") {
     Write-Pass "codex CLI installed"
   }
   else {
