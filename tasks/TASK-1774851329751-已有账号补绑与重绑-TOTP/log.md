@@ -4,3 +4,4 @@
 - 2026-03-30T06:15:53.854Z [agent] 任务状态更新为 in_progress：已完成现状排查：当前前端仅支持注册时创建 TOTP，新建 TOTP 不会自动关联旧设备；后端已具备已登录账号补绑 TOTP 接口，待补前端入口。
 - 2026-03-30T06:15:53.869Z [agent] 已基于仓库上下文确认问题根因：登录方式(passkey/TOTP)与 /device 设备授权是两条独立链路；用户当前误区来自前端缺少对已有账号的 TOTP 补绑/重绑入口。
 - 2026-03-30T08:00:24.512Z [agent] 已完成当前前端与后端 TOTP 链路回读：后端已有已登录账号的 /auth/totp/setup/options|verify 能力，前端现仅在注册页暴露 TOTP 创建入口，登录页缺少对已有账号的补绑/重绑入口与对设备授权关系的解释。
+- 2026-03-30T09:03:19.975Z [agent] 已根据已批准 spec 写出 implementation plan：先用 Orbit focused regression 锁定已登录账号 TOTP 重绑 contract，再补 auth store 的账户卡专用状态机，最后在 Settings 账户区接线 Passkey/TOTP 状态卡、重绑确认与成功提示。
