@@ -180,6 +180,24 @@ describe("i18n store", () => {
     expect(i18n.t("settings.account.notice.deviceUnaffected")).toBe("已授权设备不会被自动下线。");
   });
 
+  test("translates sessions search and sort labels in both locales", async () => {
+    const { i18n } = await loadI18n();
+    expect(i18n.t("sessions.searchPlaceholder")).toBe("Search sessions");
+    expect(i18n.t("sessions.sortLabel")).toBe("Sort");
+    expect(i18n.t("sessions.loadingMore")).toBe("Loading more sessions...");
+    expect(i18n.t("sessions.sortUpdated")).toBe("Recently updated");
+    expect(i18n.t("sessions.sortNewest")).toBe("Newest first");
+    expect(i18n.t("sessions.emptyFiltered")).toBe("No sessions match this search.");
+
+    i18n.set("zh-CN");
+    expect(i18n.t("sessions.searchPlaceholder")).toBe("搜索会话");
+    expect(i18n.t("sessions.sortLabel")).toBe("排序");
+    expect(i18n.t("sessions.loadingMore")).toBe("正在加载更多会话...");
+    expect(i18n.t("sessions.sortUpdated")).toBe("最近更新优先");
+    expect(i18n.t("sessions.sortNewest")).toBe("最新优先");
+    expect(i18n.t("sessions.emptyFiltered")).toBe("没有匹配当前搜索的会话。");
+  });
+
   test("translates project picker and worktree modal labels", async () => {
     const { i18n } = await loadI18n();
     expect(i18n.t("projectPicker.browseDirectories")).toBe("Browse directories");

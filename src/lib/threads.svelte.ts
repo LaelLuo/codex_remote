@@ -4,6 +4,7 @@ import { messages } from "./messages.svelte";
 import { models } from "./models.svelte";
 import { anchors } from "./anchors.svelte";
 import { auth } from "./auth.svelte";
+import { filterSessionsByQuery } from "./session-search";
 import { navigate } from "../router";
 
 const STORE_KEY = "__codex_remote_threads_store__";
@@ -49,17 +50,36 @@ interface PendingStart {
   onThreadStartFailed: ((error: Error) => void) | null;
 }
 
+type ThreadListSortMode = "updated" | "newest";
+
+interface PendingListRequest {
+  append: boolean;
+  cursor: string | null;
+  query: string;
+  limit: number;
+  revision: number;
+  sort: ThreadListSortMode;
+}
+
 class ThreadsStore {
   list = $state<ThreadInfo[]>([]);
   currentId = $state<string | null>(null);
   loading = $state(false);
+  hasMore = $state(false);
+  loadingMore = $state(false);
 
   #settings = $state<Map<string, ThreadSettings>>(new Map());
   #projectByThread = $state<Map<string, string>>(new Map());
   #nextId = 1;
   #pendingRequests = new Map<number, string>();
+  #pendingListRequests = new Map<number, PendingListRequest>();
   #pendingStarts = new Map<number, PendingStart>();
   #collaborationPresets: CollaborationModeMask[] = [];
+  #threadListCursor: string | null = null;
+  #threadListLoaded: ThreadInfo[] = [];
+  #threadListQuery = "";
+  #threadListRevision = 0;
+  #threadListSort: ThreadListSortMode = "updated";
 
   constructor() {
     this.#loadSettings();
@@ -102,15 +122,39 @@ class ThreadsStore {
   }
 
   fetch() {
-    const id = this.#nextId++;
-    this.loading = true;
-    this.#pendingRequests.set(id, "list");
-    const anchorId = this.#resolveAnchorIdForRequest(false);
-    socket.send({
-      method: "thread/list",
-      id,
-      params: { cursor: null, limit: 25, ...(anchorId ? { anchorId } : {}) },
+    this.fetchSessions({ reset: true, query: "", sort: "updated" });
+  }
+
+  fetchSessions(options?: { reset?: boolean; query?: string; sort?: ThreadListSortMode }) {
+    const query = (options?.query ?? this.#threadListQuery).trim();
+    const sort = options?.sort ?? this.#threadListSort;
+    const shouldReset = options?.reset === true || query !== this.#threadListQuery || sort !== this.#threadListSort;
+    if (!shouldReset && (!this.hasMore || this.loading || this.loadingMore || !this.#threadListCursor)) {
+      return;
+    }
+
+    if (shouldReset) {
+      this.#threadListQuery = query;
+      this.#threadListSort = sort;
+      this.#threadListCursor = null;
+      this.#threadListLoaded = [];
+      this.#threadListRevision += 1;
+      this.hasMore = false;
+      this.list = [];
+    }
+
+    this.#requestSessionList({
+      append: !shouldReset,
+      cursor: shouldReset ? null : this.#threadListCursor,
+      query,
+      limit: 25,
+      revision: this.#threadListRevision,
+      sort,
     });
+  }
+
+  fetchNextSessions() {
+    this.fetchSessions({ reset: false });
   }
 
   open(threadId: string) {
@@ -203,7 +247,7 @@ class ThreadsStore {
   handleMessage(msg: RpcMessage) {
     if (msg.method === "thread/started") {
       const params = msg.params as { thread: ThreadInfo };
-      if (params?.thread) {
+      if (params?.thread && !this.#threadListQuery) {
         socket.subscribeThread(params.thread.id);
         this.#addThread(params.thread);
       }
@@ -215,11 +259,55 @@ class ThreadsStore {
       this.#pendingRequests.delete(msg.id as number);
 
       if (type === "list" && msg.result) {
-        const result = msg.result as { data: ThreadInfo[] };
-        this.list = result.data || [];
-        this.loading = false;
+        const pending = this.#pendingListRequests.get(msg.id as number) ?? null;
+        this.#pendingListRequests.delete(msg.id as number);
+        const result = msg.result as { data?: ThreadInfo[]; nextCursor?: string | null };
+        if (!pending || pending.revision !== this.#threadListRevision) {
+          return;
+        }
+        const nextCursor = typeof result.nextCursor === "string" && result.nextCursor.trim() && result.nextCursor !== pending.cursor
+          ? result.nextCursor
+          : null;
+        const loaded = pending.append
+          ? this.#mergeThreads(this.#threadListLoaded, result.data ?? [])
+          : [...(result.data ?? [])];
+        const visible = filterSessionsByQuery(loaded, pending.query);
+        const shouldContinueSearch = pending.query.length > 0 && nextCursor !== null;
+        const shouldKeepPrimaryLoading = pending.query.length > 0 && visible.length === 0 && shouldContinueSearch;
+
+        this.#threadListCursor = nextCursor;
+        this.#threadListLoaded = loaded;
+        this.hasMore = nextCursor !== null;
+        this.list = visible;
+        if (pending.append) {
+          this.loadingMore = false;
+        } else {
+          this.loading = false;
+        }
+        this.loading = shouldKeepPrimaryLoading;
+
+        if (shouldContinueSearch) {
+          this.#requestSessionList({
+            append: true,
+            cursor: nextCursor,
+            query: pending.query,
+            limit: pending.limit,
+            revision: pending.revision,
+            sort: pending.sort,
+          });
+        }
       }
       if (type === "list" && msg.error) {
+        const pending = this.#pendingListRequests.get(msg.id as number) ?? null;
+        this.#pendingListRequests.delete(msg.id as number);
+        if (!pending || pending.revision !== this.#threadListRevision) {
+          return;
+        }
+        if (pending.append) {
+          this.loadingMore = false;
+        } else {
+          this.loading = false;
+        }
         this.loading = false;
       }
 
@@ -268,6 +356,42 @@ class ThreadsStore {
   #addThread(thread: ThreadInfo) {
     if (this.list.some((t) => t.id === thread.id)) return;
     this.list = [thread, ...this.list];
+  }
+
+  #requestSessionList(request: PendingListRequest) {
+    const id = this.#nextId++;
+    if (request.append) {
+      this.loadingMore = true;
+    } else {
+      this.loading = true;
+      this.loadingMore = false;
+    }
+    this.#pendingRequests.set(id, "list");
+    this.#pendingListRequests.set(id, request);
+    const anchorId = this.#resolveAnchorIdForRequest(false);
+    socket.send({
+      method: "thread/list",
+      id,
+      params: {
+        cursor: request.cursor,
+        limit: request.limit,
+        sortKey: request.sort === "newest" ? "created_at" : "updated_at",
+        ...(request.query ? { searchTerm: request.query } : {}),
+        ...(anchorId ? { anchorId } : {}),
+      },
+    });
+  }
+
+  #mergeThreads(existing: ThreadInfo[], incoming: ThreadInfo[]): ThreadInfo[] {
+    if (incoming.length === 0) return existing;
+    const merged = [...existing];
+    const seen = new Set(existing.map((thread) => thread.id));
+    for (const thread of incoming) {
+      if (seen.has(thread.id)) continue;
+      seen.add(thread.id);
+      merged.push(thread);
+    }
+    return merged;
   }
 
   #handleStartedThread(thread: ThreadInfo, pending: PendingStart | null) {

@@ -9,6 +9,7 @@ export interface ThreadInfo {
   id: string;
   preview?: string;
   createdAt?: number;
+  updatedAt?: number;
   modelProvider?: string;
 }
 

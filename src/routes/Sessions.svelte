@@ -1,5 +1,6 @@
 <script lang="ts">
   import { socket } from "../lib/socket.svelte";
+  import { shouldSubmitSessionSearch } from "../lib/session-search";
   import { threads } from "../lib/threads.svelte";
   import { i18n } from "../lib/i18n.svelte";
   import { theme } from "../lib/theme.svelte";
@@ -7,6 +8,12 @@
   import ShimmerDot from "../lib/components/ShimmerDot.svelte";
 
   const themeIcons = { system: "◐", light: "○", dark: "●" } as const;
+  type SessionSortMode = "updated" | "newest";
+  const sessionSortOptions: SessionSortMode[] = ["updated", "newest"];
+  let searchQuery = $state("");
+  let sortMode = $state<SessionSortMode>("updated");
+  let debouncedSearchQuery = $state("");
+  let loadMoreSentinel = $state<HTMLDivElement | null>(null);
 
   function formatTime(ts?: number): string {
     if (!ts) return "";
@@ -19,10 +26,47 @@
     });
   }
 
-  $effect(() => {
-    if (socket.status === "connected") {
-      threads.fetch();
+  function submitSearch() {
+    const query = searchQuery.trim();
+    if (query !== debouncedSearchQuery) {
+      debouncedSearchQuery = query;
+      return;
     }
+    threads.fetchSessions({
+      reset: true,
+      query,
+      sort: sortMode,
+    });
+  }
+
+  $effect(() => {
+    const handle = setTimeout(() => {
+      debouncedSearchQuery = searchQuery.trim();
+    }, 200);
+    return () => clearTimeout(handle);
+  });
+
+  $effect(() => {
+    if (socket.status !== "connected") return;
+    threads.fetchSessions({
+      reset: true,
+      query: debouncedSearchQuery,
+      sort: sortMode,
+    });
+  });
+
+  $effect(() => {
+    if (typeof IntersectionObserver === "undefined" || !loadMoreSentinel) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          threads.fetchNextSessions();
+        }
+      },
+      { rootMargin: "240px 0px" },
+    );
+    observer.observe(loadMoreSentinel);
+    return () => observer.disconnect();
   });
 </script>
 
@@ -56,7 +100,35 @@
           <span class="section-subtitle">{i18n.t("sessions.history")}</span>
         </div>
         <div class="section-actions row">
-          <button class="refresh-btn" onclick={() => threads.fetch()} title={i18n.t("common.refresh")}>↻</button>
+          <input
+            class="search-input"
+            type="search"
+            bind:value={searchQuery}
+            placeholder={i18n.t("sessions.searchPlaceholder")}
+            aria-label={i18n.t("sessions.searchPlaceholder")}
+            onkeydown={(event) => {
+              if (shouldSubmitSessionSearch(event)) submitSearch();
+            }}
+          />
+          <label class="sort-control row">
+            <span>{i18n.t("sessions.sortLabel")}</span>
+            <select bind:value={sortMode} aria-label={i18n.t("sessions.sortLabel")}>
+              {#each sessionSortOptions as option}
+                <option value={option}>
+                  {i18n.t(
+                    option === "updated"
+                      ? "sessions.sortUpdated"
+                      : "sessions.sortNewest",
+                  )}
+                </option>
+              {/each}
+            </select>
+          </label>
+          <button
+            class="refresh-btn"
+            onclick={submitSearch}
+            title={i18n.t("common.refresh")}
+          >↻</button>
         </div>
       </div>
 
@@ -65,7 +137,7 @@
           <ShimmerDot /> {i18n.t("sessions.loading")}
         </div>
       {:else if threads.list.length === 0}
-        <div class="empty row">{i18n.t("sessions.empty")}</div>
+        <div class="empty row">{debouncedSearchQuery ? i18n.t("sessions.emptyFiltered") : i18n.t("sessions.empty")}</div>
       {:else}
         <ul class="session-list">
           {#each threads.list as thread (thread.id)}
@@ -73,7 +145,7 @@
               <a class="session-link row" href="/thread/{thread.id}">
                 <span class="session-icon">›</span>
                 <span class="session-preview">{thread.preview || i18n.t("common.newSession")}</span>
-                <span class="session-meta">{formatTime(thread.createdAt)}</span>
+                <span class="session-meta">{formatTime(sortMode === "updated" ? thread.updatedAt ?? thread.createdAt : thread.createdAt)}</span>
               </a>
               <button
                 class="archive-btn"
@@ -83,6 +155,14 @@
             </li>
           {/each}
         </ul>
+        {#if threads.loadingMore}
+          <div class="loading row">
+            <ShimmerDot /> {i18n.t("sessions.loadingMore")}
+          </div>
+        {/if}
+        {#if threads.hasMore}
+          <div bind:this={loadMoreSentinel} class="load-more-sentinel" aria-hidden="true"></div>
+        {/if}
       {/if}
     </section>
   </main>
@@ -145,6 +225,8 @@
 
   .section-actions {
     --row-gap: var(--space-sm);
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
 
   .section-title {
@@ -176,6 +258,37 @@
 
   .refresh-btn:hover {
     color: var(--cli-text);
+  }
+
+  .search-input,
+  .sort-control select {
+    padding: 0.42rem 0.58rem;
+    border: 1px solid var(--cli-border);
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--cli-bg) 88%, transparent);
+    color: var(--cli-text);
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+  }
+
+  .search-input {
+    min-width: min(20rem, 42vw);
+  }
+
+  .search-input:focus,
+  .sort-control select:focus {
+    outline: none;
+    border-color: var(--cli-prefix-agent);
+  }
+
+  .sort-control {
+    --row-gap: 0.4rem;
+    align-items: center;
+    color: var(--cli-text-muted);
+    font-size: var(--text-xs);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-family: var(--font-mono);
   }
 
   .session-list {
@@ -254,6 +367,10 @@
     background: color-mix(in srgb, var(--cli-bg) 66%, transparent);
   }
 
+  .load-more-sentinel {
+    height: 1px;
+  }
+
   @media (max-width: 900px) {
     .sessions-content {
       padding: var(--space-md);
@@ -261,6 +378,14 @@
 
     .masthead h1 {
       font-size: clamp(3.2rem, 20vw, 6rem);
+    }
+
+    .search-input {
+      min-width: 100%;
+    }
+
+    .section-actions {
+      justify-content: stretch;
     }
   }
 </style>

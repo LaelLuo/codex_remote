@@ -284,3 +284,164 @@ describe("threads default settings", () => {
     expect(threads.getSettings("thread-1").reasoningEffort).toBe("high");
   });
 });
+
+describe("threads list pagination", () => {
+  test("fetchSessions requests the first page with server search and sort params", async () => {
+    const { threads } = await loadFreshThreadsModule();
+
+    threads.fetchSessions({ reset: true, query: "needle", sort: "updated" });
+
+    const firstRequest = socketSendMock.mock.calls[0]?.[0] as
+      | {
+          id: number;
+          method: string;
+          params: { cursor: string | null; limit: number; sortKey?: string; searchTerm?: string };
+        }
+      | undefined;
+    expect(firstRequest).toMatchObject({
+      method: "thread/list",
+      params: {
+        cursor: null,
+        limit: 25,
+        sortKey: "updated_at",
+        searchTerm: "needle",
+      },
+    });
+    expect(threads.loading).toBe(true);
+
+    threads.handleMessage({
+      id: firstRequest!.id,
+      result: {
+        data: [{ id: "thread-1", preview: "needle result", createdAt: 300, updatedAt: 400 }],
+        nextCursor: null,
+      },
+    });
+
+    expect(threads.loading).toBe(false);
+    expect(threads.loadingMore).toBe(false);
+    expect(threads.hasMore).toBe(false);
+    expect(threads.list).toEqual([{ id: "thread-1", preview: "needle result", createdAt: 300, updatedAt: 400 }]);
+  });
+
+  test("fetchNextSessions appends the next page from nextCursor", async () => {
+    const { threads } = await loadFreshThreadsModule();
+
+    threads.fetchSessions({ reset: true, query: "", sort: "newest" });
+
+    const firstRequest = socketSendMock.mock.calls[0]?.[0] as
+      | {
+          id: number;
+          method: string;
+          params: { cursor: string | null; limit: number; sortKey?: string; searchTerm?: string };
+        }
+      | undefined;
+    expect(firstRequest).toMatchObject({
+      method: "thread/list",
+      params: {
+        cursor: null,
+        limit: 25,
+        sortKey: "created_at",
+      },
+    });
+
+    threads.handleMessage({
+      id: firstRequest!.id,
+      result: {
+        data: [{ id: "thread-1", createdAt: 300, updatedAt: 400 }],
+        nextCursor: "cursor-2",
+      },
+    });
+
+    threads.fetchNextSessions();
+
+    const secondRequest = socketSendMock.mock.calls[1]?.[0] as
+      | {
+          id: number;
+          method: string;
+          params: { cursor: string | null; limit: number; sortKey?: string; searchTerm?: string };
+        }
+      | undefined;
+    expect(secondRequest).toMatchObject({
+      method: "thread/list",
+      params: {
+        cursor: "cursor-2",
+        limit: 25,
+        sortKey: "created_at",
+      },
+    });
+    expect(threads.loadingMore).toBe(true);
+
+    threads.handleMessage({
+      id: secondRequest!.id,
+      result: {
+        data: [{ id: "thread-2", createdAt: 200, updatedAt: 250 }],
+        nextCursor: null,
+      },
+    });
+
+    expect(threads.loading).toBe(false);
+    expect(threads.loadingMore).toBe(false);
+    expect(threads.hasMore).toBe(false);
+    expect(threads.list).toEqual([
+      { id: "thread-1", createdAt: 300, updatedAt: 400 },
+      { id: "thread-2", createdAt: 200, updatedAt: 250 },
+    ]);
+  });
+
+  test("search mode keeps loading pages until local filtering finds matches", async () => {
+    const { threads } = await loadFreshThreadsModule();
+
+    threads.fetchSessions({ reset: true, query: "needle", sort: "updated" });
+
+    const firstRequest = socketSendMock.mock.calls[0]?.[0] as
+      | {
+          id: number;
+          method: string;
+          params: { cursor: string | null; limit: number; sortKey?: string; searchTerm?: string };
+        }
+      | undefined;
+
+    threads.handleMessage({
+      id: firstRequest!.id,
+      result: {
+        data: [{ id: "thread-1", preview: "alpha", createdAt: 300, updatedAt: 400 }],
+        nextCursor: "cursor-2",
+      },
+    });
+
+    const secondRequest = socketSendMock.mock.calls[1]?.[0] as
+      | {
+          id: number;
+          method: string;
+          params: { cursor: string | null; limit: number; sortKey?: string; searchTerm?: string };
+        }
+      | undefined;
+    expect(secondRequest).toMatchObject({
+      method: "thread/list",
+      params: {
+        cursor: "cursor-2",
+        limit: 25,
+        sortKey: "updated_at",
+        searchTerm: "needle",
+      },
+    });
+    expect(threads.list).toEqual([]);
+    expect(threads.loading).toBe(true);
+    expect(threads.loadingMore).toBe(true);
+
+    threads.handleMessage({
+      id: secondRequest!.id,
+      result: {
+        data: [{ id: "thread-2", preview: "Needle match", createdAt: 200, updatedAt: 250 }],
+        nextCursor: null,
+      },
+    });
+
+    expect(threads.loading).toBe(false);
+    expect(threads.loadingMore).toBe(false);
+    expect(threads.hasMore).toBe(false);
+    expect(threads.list).toEqual([
+      { id: "thread-2", preview: "Needle match", createdAt: 200, updatedAt: 250 },
+    ]);
+  });
+});
