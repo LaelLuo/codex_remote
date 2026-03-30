@@ -13,7 +13,7 @@ export interface ThreadInfo {
   modelProvider?: string;
 }
 
-export type ApprovalPolicy = "on-request" | "never";
+export type ApprovalPolicy = "on-request" | "never" | "on-failure" | "unless-trusted" | string;
 
 export interface ModelOption {
   value: string;
@@ -35,6 +35,7 @@ export type SandboxMode = "read-only" | "workspace-write" | "danger-full-access"
 export interface ThreadSettings {
   model: string;
   reasoningEffort: ReasoningEffort;
+  approvalPolicy: ApprovalPolicy;
   sandbox: SandboxMode;
   mode: ModeKind;
 }

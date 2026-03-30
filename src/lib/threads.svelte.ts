@@ -5,6 +5,7 @@ import { models } from "./models.svelte";
 import { anchors } from "./anchors.svelte";
 import { auth } from "./auth.svelte";
 import { filterSessionsByQuery } from "./session-search";
+import { buildTurnStartOverrides } from "./thread-turn";
 import { navigate } from "../router";
 
 const STORE_KEY = "__codex_remote_threads_store__";
@@ -16,6 +17,7 @@ function createDefaultSettings(): ThreadSettings {
   return {
     model: defaultModel,
     reasoningEffort: models.resolveDefaultReasoningEffort(defaultModel),
+    approvalPolicy: "on-request",
     sandbox: "workspace-write",
     mode: "code",
   };
@@ -44,6 +46,8 @@ interface PendingStart {
   cwd: string | null;
   input: string | null;
   model: string | null;
+  approvalPolicy: ApprovalPolicy | null;
+  sandbox: SandboxMode | null;
   collaborationMode: CollaborationMode | null;
   suppressNavigation: boolean;
   onThreadStarted: ((threadId: string) => void) | null;
@@ -70,6 +74,8 @@ class ThreadsStore {
 
   #settings = $state<Map<string, ThreadSettings>>(new Map());
   #projectByThread = $state<Map<string, string>>(new Map());
+  #hydratedThreadIds = new Set<string>();
+  #openingThreadIds = new Set<string>();
   #nextId = 1;
   #pendingRequests = new Map<number, string>();
   #pendingListRequests = new Map<number, PendingListRequest>();
@@ -98,6 +104,7 @@ class ThreadsStore {
     if (
       current.model === next.model &&
       current.reasoningEffort === next.reasoningEffort &&
+      current.approvalPolicy === next.approvalPolicy &&
       current.sandbox === next.sandbox &&
       current.mode === next.mode
     ) {
@@ -110,6 +117,16 @@ class ThreadsStore {
   getProjectPath(threadId: string | null): string {
     if (!threadId) return "";
     return this.#projectByThread.get(threadId) ?? "";
+  }
+
+  isHydrated(threadId: string | null): boolean {
+    if (!threadId) return false;
+    return this.#hydratedThreadIds.has(threadId);
+  }
+
+  isOpening(threadId: string | null): boolean {
+    if (!threadId) return false;
+    return this.#openingThreadIds.has(threadId);
   }
 
   setProjectPath(threadId: string, path: string) {
@@ -158,8 +175,10 @@ class ThreadsStore {
   }
 
   open(threadId: string) {
+    if (this.#openingThreadIds.has(threadId)) return;
     const anchorId = this.#resolveAnchorIdForRequest(false);
     const id = this.#nextId++;
+    this.#openingThreadIds.add(threadId);
     this.loading = true;
     this.currentId = threadId;
     messages.clearThread(threadId);
@@ -236,6 +255,7 @@ class ThreadsStore {
       this.#settings = next;
       this.#saveSettings();
     }
+    this.#hydratedThreadIds.delete(threadId);
     if (this.#projectByThread.has(threadId)) {
       const next = new Map(this.#projectByThread);
       next.delete(threadId);
@@ -312,6 +332,33 @@ class ThreadsStore {
       }
 
       if (type === "resume") {
+        if (msg.result) {
+          const result = msg.result as {
+            thread?: ThreadInfo;
+            model?: string;
+            reasoningEffort?: ReasoningEffort;
+            approvalPolicy?: ApprovalPolicy | { kind?: string } | null;
+            sandbox?: { type?: string } | string;
+          };
+          const thread = result.thread;
+          if (thread?.id) {
+            this.#openingThreadIds.delete(thread.id);
+            const sandbox = this.#normalizeSandbox(result.sandbox);
+            const approvalPolicy = this.#normalizeApprovalPolicy(result.approvalPolicy);
+            this.#hydratedThreadIds.add(thread.id);
+            this.updateSettings(thread.id, {
+              model: result.model ?? this.getSettings(thread.id).model,
+              reasoningEffort:
+                result.reasoningEffort ??
+                models.resolveDefaultReasoningEffort(result.model ?? this.getSettings(thread.id).model ?? null),
+              ...(approvalPolicy ? { approvalPolicy } : {}),
+              ...(sandbox ? { sandbox } : {}),
+            });
+          }
+        }
+        if (msg.error && this.currentId) {
+          this.#openingThreadIds.delete(this.currentId);
+        }
         this.loading = false;
       }
 
@@ -333,17 +380,22 @@ class ThreadsStore {
           thread?: ThreadInfo;
           model?: string;
           reasoningEffort?: ReasoningEffort;
+          approvalPolicy?: ApprovalPolicy | { kind?: string } | null;
           sandbox?: { type?: string } | string;
         };
         const thread = result.thread;
         if (thread?.id) {
           const sandbox = this.#normalizeSandbox(result.sandbox);
+          const approvalPolicy = this.#normalizeApprovalPolicy(result.approvalPolicy);
+          this.#hydratedThreadIds.add(thread.id);
           this.updateSettings(thread.id, {
             model: result.model ?? pending?.model ?? "",
             reasoningEffort:
               result.reasoningEffort ??
               models.resolveDefaultReasoningEffort(result.model ?? pending?.model ?? null),
+            approvalPolicy: approvalPolicy ?? pending?.approvalPolicy ?? "on-request",
             ...(sandbox ? { sandbox } : {}),
+            ...(!sandbox && pending?.sandbox ? { sandbox: pending.sandbox } : {}),
           });
 
           socket.subscribeThread(thread.id);
@@ -419,12 +471,23 @@ class ThreadsStore {
           threadId: thread.id,
           input: [{ type: "text", text: pending.input }],
           ...(anchorId ? { anchorId } : {}),
-          ...(pending.collaborationMode
-            ? { collaborationMode: pending.collaborationMode }
-            : {}),
+          ...buildTurnStartOverrides(this.getSettings(thread.id), pending.collaborationMode ?? undefined),
         },
       });
     }
+  }
+
+  #normalizeApprovalPolicy(input: unknown): ApprovalPolicy | null {
+    if (!input) return null;
+    if (typeof input === "string") {
+      const normalized = input.trim();
+      return normalized || null;
+    }
+    if (typeof input === "object") {
+      const kind = (input as { kind?: unknown }).kind;
+      if (typeof kind === "string" && kind.trim()) return kind.trim();
+    }
+    return null;
   }
 
   #normalizeSandbox(input: unknown): SandboxMode | null {
@@ -469,6 +532,8 @@ class ThreadsStore {
         cwd: cwd.trim() || null,
         input: input?.trim() ? input.trim() : null,
         model: this.#resolveStartModel(options?.collaborationMode),
+        approvalPolicy: this.#normalizeApprovalPolicy(options?.approvalPolicy),
+        sandbox: this.#normalizeSandbox(options?.sandbox),
         collaborationMode: options?.collaborationMode ?? null,
         suppressNavigation: options?.suppressNavigation ?? false,
         onThreadStarted: options?.onThreadStarted ?? null,
@@ -484,6 +549,8 @@ class ThreadsStore {
       cwd: cwd.trim() || null,
       input: input?.trim() ? input.trim() : null,
       model: requestedModel,
+      approvalPolicy: this.#normalizeApprovalPolicy(options?.approvalPolicy),
+      sandbox: this.#normalizeSandbox(options?.sandbox),
       collaborationMode: options?.collaborationMode ?? null,
       suppressNavigation: options?.suppressNavigation ?? false,
       onThreadStarted: options?.onThreadStarted ?? null,

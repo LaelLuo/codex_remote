@@ -8,6 +8,7 @@ import {
   resolveReasoningEffortForModel,
   type CodexConfigModelDefaults,
 } from "./model-defaults";
+import type { ConfigDefaultsStatus } from "./home-pane-models";
 
 type FetchStatus = "idle" | "loading" | "success" | "error";
 const MODEL_LIST_TIMEOUT_MS = 12_000;
@@ -16,6 +17,7 @@ class ModelsStore {
   options = $state<ModelOption[]>([]);
   status = $state<FetchStatus>("idle");
   configDefaults = $state<CodexConfigModelDefaults>({ model: null, reasoningEffort: null });
+  configDefaultsStatus = $state<ConfigDefaultsStatus>("idle");
   defaultModel = $derived(
     pickDefaultModelOption(this.options, this.configDefaults.model)
   );
@@ -77,8 +79,10 @@ class ModelsStore {
 
   async #refreshConfigDefaults() {
     if (socket.status !== "connected") return;
+    this.configDefaultsStatus = "loading";
     if (!auth.isLocalMode && !anchors.selectedId) {
       this.configDefaults = { model: null, reasoningEffort: null };
+      this.configDefaultsStatus = "success";
       return;
     }
 
@@ -88,8 +92,10 @@ class ModelsStore {
         !auth.isLocalMode ? anchors.selectedId ?? undefined : undefined,
       );
       this.configDefaults = parseCodexConfigModelDefaults(result.content);
+      this.configDefaultsStatus = "success";
     } catch {
       this.configDefaults = { model: null, reasoningEffort: null };
+      this.configDefaultsStatus = "error";
     }
   }
 

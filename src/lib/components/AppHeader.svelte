@@ -1,38 +1,22 @@
 <script lang="ts">
     import type { Snippet } from "svelte";
-    import type { ConnectionStatus, SandboxMode } from "../types";
+    import type { ConnectionStatus } from "../types";
     import { anchors } from "../anchors.svelte";
     import { i18n } from "../i18n.svelte";
 
     interface Props {
         status: ConnectionStatus;
         threadId?: string | null;
-        sandbox?: SandboxMode;
-        onSandboxChange?: (sandbox: SandboxMode) => void;
         actions?: Snippet;
     }
 
-    const { status, threadId, sandbox, onSandboxChange, actions }: Props = $props();
+    const { status, threadId, actions }: Props = $props();
 
-    let sandboxOpen = $state(false);
     let mobileMenuOpen = $state(false);
-
-    const sandboxOptions: SandboxMode[] = ["read-only", "workspace-write", "danger-full-access"];
-
-    const selectedSandbox = $derived(sandboxOptions.find((value) => value === sandbox) ?? "workspace-write");
     const showAnchorAlert = $derived(status === "connected" && anchors.status === "none");
-
-    function sandboxLabel(value: SandboxMode): string {
-        if (value === "read-only") return i18n.t("appHeader.sandbox.readOnly");
-        if (value === "danger-full-access") return i18n.t("appHeader.sandbox.fullAccess");
-        return i18n.t("appHeader.sandbox.workspace");
-    }
 
     function handleClickOutside(e: MouseEvent) {
         const target = e.target as HTMLElement;
-        if (!target.closest(".sandbox-dropdown")) {
-            sandboxOpen = false;
-        }
         if (!target.closest(".mobile-menu") && !target.closest(".hamburger-btn")) {
             mobileMenuOpen = false;
         }
@@ -57,52 +41,6 @@
         {#if showAnchorAlert}
             <span class="separator">·</span>
             <a class="anchor-alert anchor-alert-link" href="/device">{i18n.t("appHeader.anchorAuthorize")}</a>
-        {/if}
-
-        {#if sandbox && onSandboxChange}
-            <span class="separator">·</span>
-            <div class="sandbox-dropdown" class:open={sandboxOpen}>
-                <button
-                    type="button"
-                    class="sandbox-btn row"
-                    class:danger={sandbox === "danger-full-access"}
-                    onclick={(e) => {
-                        e.stopPropagation();
-                        sandboxOpen = !sandboxOpen;
-                    }}
-                >
-                    <svg class="shield-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
-                    </svg>
-                    <span class="sandbox-label">{sandboxLabel(selectedSandbox)}</span>
-                    <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="m6 9 6 6 6-6" />
-                    </svg>
-                </button>
-                {#if sandboxOpen}
-                    <div class="sandbox-menu">
-                        {#each sandboxOptions as option}
-                            <button
-                                type="button"
-                                class="sandbox-item split"
-                                class:selected={sandbox === option}
-                                class:danger={option === "danger-full-access"}
-                                onclick={() => {
-                                    onSandboxChange(option);
-                                    sandboxOpen = false;
-                                }}
-                            >
-                                <span>{sandboxLabel(option)}</span>
-                                {#if sandbox === option}
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                                        <polyline points="20 6 9 17 4 12" />
-                                    </svg>
-                                {/if}
-                            </button>
-                        {/each}
-                    </div>
-                {/if}
-            </div>
         {/if}
 
         <div class="spacer"></div>
@@ -229,123 +167,6 @@
 
     .spacer {
         flex: 1;
-    }
-
-    /* Sandbox dropdown */
-    .sandbox-dropdown {
-        position: relative;
-    }
-
-    .sandbox-btn {
-        --row-gap: var(--space-xs);
-        padding: 0.34rem 0.5rem;
-        background: transparent;
-        border: 1px solid var(--cli-border);
-        border-radius: var(--radius-md);
-        color: var(--cli-text-dim);
-        font-family: var(--font-mono);
-        font-size: var(--text-xs);
-        text-transform: uppercase;
-        letter-spacing: 0.03em;
-        cursor: pointer;
-        transition: all var(--transition-fast);
-    }
-
-    .sandbox-btn .sandbox-label,
-    .sandbox-btn .chevron {
-        display: none;
-    }
-
-    @media (min-width: 640px) {
-        .sandbox-btn .sandbox-label,
-        .sandbox-btn .chevron {
-            display: block;
-        }
-    }
-
-    .sandbox-btn:hover {
-        background: var(--cli-selection);
-        color: var(--cli-text);
-        border-color: var(--cli-text-muted);
-    }
-
-    .sandbox-btn.danger {
-        color: var(--cli-error);
-        border-color: var(--cli-error);
-    }
-
-    .sandbox-btn.danger:hover {
-        background: var(--cli-error-bg);
-    }
-
-    .shield-icon {
-        width: 0.875rem;
-        height: 0.875rem;
-    }
-
-    .sandbox-btn .chevron {
-        width: 0.625rem;
-        height: 0.625rem;
-        opacity: 0.5;
-        flex-shrink: 0;
-    }
-
-    .sandbox-menu {
-        position: absolute;
-        top: 100%;
-        left: 0;
-        min-width: 140px;
-        margin-top: var(--space-xs);
-        padding: var(--space-xs);
-        background: var(--cli-bg-elevated);
-        border: 1px solid var(--cli-border);
-        border-radius: var(--radius-md);
-        box-shadow: var(--shadow-popover);
-        z-index: 100;
-        animation: fadeIn 0.1s ease;
-    }
-
-    @keyframes fadeIn {
-        from {
-            opacity: 0;
-            transform: translateY(-4px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-
-    .sandbox-item {
-        --split-gap: var(--space-sm);
-        width: 100%;
-        padding: var(--space-sm);
-        background: transparent;
-        border: none;
-        border-radius: var(--radius-sm);
-        color: var(--cli-text);
-        font-family: var(--font-mono);
-        font-size: var(--text-xs);
-        text-align: left;
-        cursor: pointer;
-        transition: background var(--transition-fast);
-    }
-
-    .sandbox-item:hover {
-        background: var(--cli-bg-hover);
-    }
-
-    .sandbox-item.selected {
-        color: var(--cli-prefix-agent);
-    }
-
-    .sandbox-item.danger {
-        color: var(--cli-error);
-    }
-
-    .sandbox-item svg {
-        width: 0.875rem;
-        height: 0.875rem;
     }
 
     /* Desktop actions */

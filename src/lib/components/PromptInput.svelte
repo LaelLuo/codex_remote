@@ -1,11 +1,13 @@
 <script lang="ts">
   import { extractClipboardImageFiles, readTurnImages } from "../input-images";
   import { i18n } from "../i18n.svelte";
-  import type { ModeKind, ModelOption, ReasoningEffort, TurnImageInput } from "../types";
+  import SandboxPicker from "./SandboxPicker.svelte";
+  import type { ModeKind, ModelOption, ReasoningEffort, SandboxMode, TurnImageInput } from "../types";
 
   interface Props {
     model: string;
     reasoningEffort: ReasoningEffort;
+    sandbox: SandboxMode;
     mode?: ModeKind;
     modelOptions?: ModelOption[];
     modelsLoading?: boolean;
@@ -14,12 +16,14 @@
     onSubmit: (input: string, images?: TurnImageInput[]) => void;
     onModelChange: (model: string) => void;
     onReasoningChange: (effort: ReasoningEffort) => void;
+    onSandboxChange: (sandbox: SandboxMode) => void;
     onModeChange?: (mode: ModeKind) => void;
   }
 
   const {
     model,
     reasoningEffort,
+    sandbox,
     mode = "code",
     modelOptions = [],
     modelsLoading = false,
@@ -28,6 +32,7 @@
     onSubmit,
     onModelChange,
     onReasoningChange,
+    onSandboxChange,
     onModeChange,
   }: Props = $props();
 
@@ -321,6 +326,8 @@
             </div>
           {/if}
         </div>
+
+        <SandboxPicker {sandbox} {disabled} on:change={(e) => onSandboxChange(e.detail.value)} />
 
         <!-- Mode Toggle -->
         {#if onModeChange}

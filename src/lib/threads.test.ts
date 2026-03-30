@@ -283,6 +283,84 @@ describe("threads default settings", () => {
     expect(modelsMock.resolveDefaultReasoningEffort).toHaveBeenCalledWith("gpt-test");
     expect(threads.getSettings("thread-1").reasoningEffort).toBe("high");
   });
+
+  test("persists approval policy and reuses it for the initial turn", async () => {
+    anchorsMock.list = [{ id: "anchor-1" }];
+    anchorsMock.selectedId = "anchor-1";
+    anchorsMock.selected = { id: "anchor-1" };
+
+    const { threads } = await loadFreshThreadsModule();
+
+    threads.start("C:/repo", "task", {
+      approvalPolicy: "never",
+      sandbox: "danger-full-access",
+    });
+
+    const startRequest = socketSendMock.mock.calls[0]?.[0] as { id: number } | undefined;
+    expect(startRequest?.params).toMatchObject({
+      approvalPolicy: "never",
+      sandbox: "danger-full-access",
+    });
+
+    threads.handleMessage({
+      id: startRequest!.id,
+      result: {
+        thread: { id: "thread-1" },
+        model: "gpt-test",
+        reasoningEffort: "medium",
+        approvalPolicy: "never",
+        sandbox: { type: "dangerFullAccess" },
+      },
+    });
+
+    expect(threads.getSettings("thread-1")).toMatchObject({
+      approvalPolicy: "never",
+      sandbox: "danger-full-access",
+    });
+    expect(threads.isHydrated("thread-1")).toBe(true);
+
+    const turnRequest = socketSendMock.mock.calls[1]?.[0] as
+      | { method: string; params: Record<string, unknown> }
+      | undefined;
+    expect(turnRequest).toMatchObject({
+      method: "turn/start",
+      params: {
+        threadId: "thread-1",
+        approvalPolicy: "never",
+        sandboxPolicy: { type: "dangerFullAccess" },
+      },
+    });
+  });
+
+  test("hydrates approval policy from thread resume responses", async () => {
+    anchorsMock.list = [{ id: "anchor-1" }];
+    anchorsMock.selectedId = "anchor-1";
+    anchorsMock.selected = { id: "anchor-1" };
+
+    const { threads } = await loadFreshThreadsModule();
+
+    threads.open("thread-1");
+
+    const resumeRequest = socketSendMock.mock.calls[0]?.[0] as { id: number } | undefined;
+    threads.handleMessage({
+      id: resumeRequest!.id,
+      result: {
+        thread: { id: "thread-1" },
+        model: "gpt-test",
+        reasoningEffort: "medium",
+        approvalPolicy: "never",
+        sandbox: { type: "dangerFullAccess" },
+      },
+    });
+
+    expect(threads.getSettings("thread-1")).toMatchObject({
+      approvalPolicy: "never",
+      sandbox: "danger-full-access",
+      model: "gpt-test",
+      reasoningEffort: "medium",
+    });
+    expect(threads.isHydrated("thread-1")).toBe(true);
+  });
 });
 
 describe("threads list pagination", () => {

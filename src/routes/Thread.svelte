@@ -18,6 +18,9 @@
         ulwRuntime,
     } from "../lib/ulw";
     import { buildBangTerminalPrompt, parseBangTerminalCommand } from "../lib/bang-command";
+    import { shouldOpenThreadOnRoute } from "../lib/thread-route";
+    import { buildThreadPermissionSettings } from "../lib/thread-permissions";
+    import { buildTurnStartOverrides } from "../lib/thread-turn";
     import AppHeader from "../lib/components/AppHeader.svelte";
     import MessageBlock from "../lib/components/MessageBlock.svelte";
     import ApprovalPrompt from "../lib/components/ApprovalPrompt.svelte";
@@ -94,7 +97,13 @@
 
 
     $effect(() => {
-        if (threadId && socket.status === "connected" && threads.currentId !== threadId) {
+        if (shouldOpenThreadOnRoute(
+            threadId,
+            socket.status,
+            threads.currentId,
+            threads.isHydrated(threadId),
+            threads.isOpening(threadId),
+        )) {
             threads.open(threadId);
         }
     });
@@ -112,7 +121,12 @@
 
     $effect(() => {
         if (!threadId) return;
-        threads.updateSettings(threadId, { model, reasoningEffort, sandbox, mode });
+        threads.updateSettings(threadId, {
+            model,
+            reasoningEffort,
+            mode,
+            ...buildThreadPermissionSettings(sandbox),
+        });
     });
 
     $effect(() => {
@@ -209,28 +223,30 @@
             ...(selectedAnchorId ? { anchorId: selectedAnchorId } : {}),
         };
 
-        if (model.trim()) {
-            params.model = model.trim();
-        }
-        if (reasoningEffort) {
-            params.effort = reasoningEffort;
-        }
-        if (sandbox) {
-            const sandboxTypeMap: Record<SandboxMode, string> = {
-                "read-only": "readOnly",
-                "workspace-write": "workspaceWrite",
-                "danger-full-access": "dangerFullAccess",
-            };
-            params.sandboxPolicy = { type: sandboxTypeMap[sandbox] };
-        }
-
-        if (model.trim()) {
-            params.collaborationMode = threads.resolveCollaborationMode(
+        const collaborationMode = model.trim()
+            ? threads.resolveCollaborationMode(
                 mode,
                 model.trim(),
                 reasoningEffort,
-            );
+            )
+            : undefined;
+        if (collaborationMode) {
+            params.collaborationMode = collaborationMode;
         }
+        const currentSettings = threads.getSettings(targetThreadId);
+        Object.assign(
+            params,
+            buildTurnStartOverrides(
+                {
+                    ...currentSettings,
+                    ...buildThreadPermissionSettings(sandbox),
+                    model: model.trim() || currentSettings.model,
+                    reasoningEffort,
+                    mode,
+                },
+                collaborationMode,
+            ),
+        );
 
         const result = socket.send({
             method: "turn/start",
@@ -411,8 +427,6 @@
     <AppHeader
         status={socket.status}
         threadId={threadId}
-        {sandbox}
-        onSandboxChange={(v) => sandbox = v}
     >
         {#snippet actions()}
             <a href="/settings">{i18n.t("thread.settingsLink")}</a>
@@ -525,6 +539,7 @@
                     <PromptInput
                         {model}
                         {reasoningEffort}
+                        {sandbox}
                         {mode}
                         modelOptions={models.options}
                         modelsLoading={models.status === "loading" || models.status === "idle"}
@@ -533,6 +548,7 @@
                         onSubmit={handleSubmit}
                         onModelChange={(v) => model = v}
                         onReasoningChange={(v) => reasoningEffort = v}
+                        onSandboxChange={(v) => sandbox = v}
                         onModeChange={(v) => { modeUserOverride = true; mode = v; }}
                     />
                 </div>

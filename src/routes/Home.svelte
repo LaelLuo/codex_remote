@@ -15,7 +15,10 @@
     ulwRuntime,
   } from "../lib/ulw";
   import { buildBangTerminalPrompt, parseBangTerminalCommand } from "../lib/bang-command";
+  import { buildThreadPermissionSettings } from "../lib/thread-permissions";
+  import { buildTurnStartOverrides } from "../lib/thread-turn";
   import { readTurnImages } from "../lib/input-images";
+  import { applyHomeDefaultModelToPanes } from "../lib/home-pane-models";
   import AppHeader from "../lib/components/AppHeader.svelte";
   import HomeTaskComposer from "../lib/components/HomeTaskComposer.svelte";
   import WorktreeModal from "../lib/components/WorktreeModal.svelte";
@@ -24,7 +27,7 @@
   import ApprovalPrompt from "../lib/components/ApprovalPrompt.svelte";
   import UserInputPrompt from "../lib/components/UserInputPrompt.svelte";
   import PlanCard from "../lib/components/PlanCard.svelte";
-  import type { ModeKind, TurnImageInput } from "../lib/types";
+  import type { ModeKind, SandboxMode, TurnImageInput } from "../lib/types";
 
   const themeIcons = { system: "◐", light: "○", dark: "●" } as const;
   const RECENT_LIMIT = 5;
@@ -45,6 +48,7 @@
     project: string;
     threadId: string | null;
     mode: ModeKind;
+    sandbox: SandboxMode;
     selectedModel: string;
     isCreating: boolean;
     pendingStartToken: number | null;
@@ -111,6 +115,7 @@
         project: "",
         threadId: null,
         mode: "code",
+        sandbox: "workspace-write",
         selectedModel: "",
         isCreating: false,
         pendingStartToken: null,
@@ -208,11 +213,26 @@
     };
 
     const effectiveModel = pane.selectedModel.trim() || models.defaultModel?.value?.trim() || "";
+    const currentSettings = threads.getSettings(targetThreadId);
+    const permissionSettings = buildThreadPermissionSettings(pane.sandbox);
+    const resolvedReasoningEffort = models.resolveDefaultReasoningEffort(effectiveModel || currentSettings.model);
+    const collaborationMode = effectiveModel ? resolvePaneCollaborationMode(pane) : undefined;
     if (effectiveModel) {
-      params.model = effectiveModel;
-      params.collaborationMode = resolvePaneCollaborationMode(pane);
+      params.collaborationMode = collaborationMode;
     }
-    params.effort = models.resolveDefaultReasoningEffort(effectiveModel);
+    Object.assign(
+      params,
+      buildTurnStartOverrides(
+        {
+          ...currentSettings,
+          ...permissionSettings,
+          model: effectiveModel || currentSettings.model,
+          reasoningEffort: resolvedReasoningEffort,
+          mode: pane.mode,
+        },
+        collaborationMode,
+      ),
+    );
 
     const result = socket.send({
       method: "turn/start",
@@ -420,6 +440,13 @@
     updatePane(paneId, { selectedModel: value });
   }
 
+  function handleSandboxChange(paneId: number, value: SandboxMode) {
+    updatePane(paneId, { sandbox: value });
+    const pane = getPane(paneId);
+    if (!pane?.threadId) return;
+    threads.updateSettings(pane.threadId, buildThreadPermissionSettings(value));
+  }
+
   function handleToggleMode(paneId: number) {
     const pane = getPane(paneId);
     if (!pane) return;
@@ -525,6 +552,7 @@
           : rawInput;
       threads.start(pane.project.trim(), startInput, {
         suppressNavigation: true,
+        ...buildThreadPermissionSettings(pane.sandbox),
         ...(collaborationMode ? { collaborationMode } : {}),
         onThreadStarted: (threadId) => {
           updatePane(paneId, { threadId, submitError: null });
@@ -576,19 +604,12 @@
   }
 
   $effect(() => {
-    const defaultModel = models.defaultModel?.value;
-    if (!defaultModel) return;
-
-    let changed = false;
-    const next = panes.map((pane) => {
-      if (pane.selectedModel) return pane;
-      changed = true;
-      return { ...pane, selectedModel: defaultModel };
-    });
-
-    if (changed) {
-      panes = next;
-    }
+    const syncResult = applyHomeDefaultModelToPanes(
+      panes,
+      models.defaultModel?.value,
+      models.configDefaultsStatus,
+    );
+    if (syncResult.changed) panes = syncResult.panes;
   });
 
   $effect(() => {
@@ -682,6 +703,7 @@
               <HomeTaskComposer
                 task={pane.task}
                 mode={pane.mode}
+                sandbox={pane.sandbox}
                 isCreating={pane.isCreating}
                 canSubmit={canSubmit(pane)}
                 worktreeDisplay={worktreeLabelFor(pane.project)}
@@ -694,6 +716,7 @@
                 on:toggleMode={() => handleToggleMode(pane.id)}
                 on:openWorktrees={() => handleOpenWorktrees(pane.id)}
                 on:selectModel={(e) => handleSelectModel(pane.id, e.detail.value)}
+                on:sandboxChange={(e) => handleSandboxChange(pane.id, e.detail.value)}
                 on:taskImagesAdded={(e) => handleTaskImagesAdded(pane.id, e.detail.images)}
                 on:taskImageRemoved={(e) => handleTaskImageRemoved(pane.id, e.detail.id)}
                 on:taskImagesCleared={() => handleTaskImagesCleared(pane.id)}

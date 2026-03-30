@@ -2,11 +2,13 @@
   import { createEventDispatcher } from "svelte";
   import { i18n } from "../i18n.svelte";
   import { extractClipboardImageFiles, readTurnImages } from "../input-images";
-  import type { ModeKind, ModelOption, TurnImageInput } from "../types";
+  import SandboxPicker from "./SandboxPicker.svelte";
+  import type { ModeKind, ModelOption, SandboxMode, TurnImageInput } from "../types";
 
   interface Props {
     task: string;
     mode: ModeKind;
+    sandbox: SandboxMode;
     isCreating: boolean;
     canSubmit: boolean;
     worktreeDisplay: string;
@@ -20,6 +22,7 @@
   const {
     task,
     mode,
+    sandbox,
     isCreating,
     canSubmit,
     worktreeDisplay,
@@ -39,6 +42,7 @@
     taskImagesAdded: { images: TurnImageInput[] };
     taskImageRemoved: { id: string };
     taskImagesCleared: void;
+    sandboxChange: { value: SandboxMode };
   }>();
 
   let modelOpen = $state(false);
@@ -192,6 +196,12 @@
           </div>
         {/if}
       </div>
+
+      <SandboxPicker
+        {sandbox}
+        disabled={isCreating}
+        on:change={(e) => dispatch("sandboxChange", { value: e.detail.value })}
+      />
 
       <!-- Mode Toggle -->
       <button
