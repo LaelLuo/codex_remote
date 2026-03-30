@@ -35,7 +35,7 @@
 - Bun runtime
 - 基于 stdio 的 JSONL/JSON-RPC
 - 连接 control plane 的 WebSocket
-- device access tokens（主路径）+ legacy JWT secret（向后兼容）
+- device access tokens（`anchorAccessToken` + `anchorRefreshToken`）
 
 ### 2) Orbit / Control Plane
 
@@ -82,7 +82,7 @@ Providers：
 1. Anchor 通过 `POST /auth/device/code` 请求 code
 2. 用户在浏览器中通过 `POST /auth/device/authorise` 确认 code
 3. Anchor 轮询 `POST /auth/device/token`
-4. 授权完成后，Anchor 获取 `anchorAccessToken` + `anchorRefreshToken`（或 legacy secret）
+4. 授权完成后，Anchor 获取 `anchorAccessToken` + `anchorRefreshToken`
 5. token 过期后，Anchor 通过 `POST /auth/device/refresh` 刷新
 
 ### C) 工作会话
@@ -147,7 +147,7 @@ codex app-server generate-ts --out DIR
 
 - 用户认证通过 passkey/TOTP（FastAPI 模式还支持 basic）
 - access/refresh tokens 带服务端会话校验与撤销能力
-- web 与 anchor 上下文使用独立 tokens/secrets
+- web 与 anchor 上下文使用独立 token/session 模型
 - 外部流量使用 TLS
 
 详情见 [auth.md](auth.md) 与 [security.md](security.md)。

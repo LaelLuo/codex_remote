@@ -53,20 +53,6 @@ def verify_web_token(token: str) -> dict[str, Any] | None:
         return None
 
 
-def verify_anchor_jwt_legacy(token: str) -> dict[str, Any] | None:
-    try:
-        return jwt.decode(
-            token,
-            settings.anchor_jwt_secret,
-            algorithms=["HS256"],
-            audience="codex-remote-orbit-anchor",
-            issuer="codex-remote-anchor",
-            options={"require": ["exp", "sub", "iss", "aud"]},
-        )
-    except jwt.PyJWTError:
-        return None
-
-
 def verify_anchor_access_token(token: str) -> dict[str, Any] | None:
     session = db.get_active_anchor_session_by_access_token(token)
     if not session:
@@ -187,4 +173,4 @@ def verify_anchor_any_token(token: str) -> dict[str, Any] | None:
     opaque = verify_anchor_access_token(token)
     if opaque:
         return opaque
-    return verify_anchor_jwt_legacy(token)
+    return None

@@ -5,6 +5,7 @@ import sys
 import uuid
 from pathlib import Path
 
+import jwt
 from fastapi.testclient import TestClient
 
 SERVICE_ROOT = Path(__file__).resolve().parents[1]
@@ -177,6 +178,19 @@ def test_device_flow_anchor_token_refresh_and_ws_preflight(tmp_path: Path, monke
 
         new_preflight = client.get("/ws/anchor", params={"token": rotated_payload["anchorAccessToken"]})
         assert new_preflight.status_code == 426
+
+        legacy_jwt = jwt.encode(
+            {
+                "iss": "codex-remote-anchor",
+                "aud": "codex-remote-orbit-anchor",
+                "sub": registered["user"]["id"],
+                "exp": 4_102_444_800,
+            },
+            "test-anchor-secret",
+            algorithm="HS256",
+        )
+        legacy_preflight = client.get("/ws/anchor", params={"token": legacy_jwt})
+        assert legacy_preflight.status_code == 401
 
 
 def test_websocket_relay_isolated_per_user(tmp_path: Path, monkeypatch) -> None:

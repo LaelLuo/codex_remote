@@ -32,6 +32,18 @@ interface AuthSessionRow {
   refresh_expires_at: number | null;
 }
 
+interface AnchorSessionRow {
+  id: string;
+  user_id: string;
+  access_token_hash: string;
+  refresh_token_hash: string;
+  created_at: number;
+  updated_at: number;
+  access_expires_at: number;
+  refresh_expires_at: number;
+  revoked_at: number | null;
+}
+
 interface TotpFactorRow {
   user_id: string;
   secret_base32: string;
@@ -41,9 +53,42 @@ interface TotpFactorRow {
   last_used_step: number | null;
 }
 
+const ANCHOR_ACCESS_TOKEN_TTL_SEC = 60 * 60;
+const ANCHOR_REFRESH_TOKEN_TTL_SEC = 30 * 24 * 60 * 60;
+
+export interface AnchorSessionTokens {
+  accessToken: string;
+  refreshToken: string;
+  accessExpiresIn: number;
+}
+
+export interface AnchorSessionLookup {
+  sessionId: string;
+  userId: string;
+}
+
+export interface AnchorSessionRefreshResult extends AnchorSessionTokens {
+  userId: string;
+}
+
 export function randomUserId(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   return base64UrlEncode(bytes);
+}
+
+function randomOpaqueToken(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return base64UrlEncode(bytes);
+}
+
+function nowSec(): number {
+  return Math.floor(Date.now() / 1000);
+}
+
+async function hashOpaqueToken(token: string): Promise<string> {
+  const data = new TextEncoder().encode(token);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  return base64UrlEncode(new Uint8Array(hash));
 }
 
 function parseTransports(value: string | null): StoredCredential["transports"] {
@@ -247,4 +292,96 @@ export async function consumeRefreshToken(
     .bind(Date.now(), refreshTokenHash, nowSec)
     .first<AuthSessionRow>();
   return row ?? null;
+}
+
+export async function createAnchorSession(env: AuthEnv, userId: string): Promise<AnchorSessionTokens> {
+  const accessToken = randomOpaqueToken();
+  const refreshToken = randomOpaqueToken();
+  const [accessTokenHash, refreshTokenHash] = await Promise.all([
+    hashOpaqueToken(accessToken),
+    hashOpaqueToken(refreshToken),
+  ]);
+  const createdAt = Date.now();
+  const issuedAtSec = nowSec();
+  const accessExpiresAt = issuedAtSec + ANCHOR_ACCESS_TOKEN_TTL_SEC;
+  const refreshExpiresAt = issuedAtSec + ANCHOR_REFRESH_TOKEN_TTL_SEC;
+
+  await env.DB.prepare(
+    "INSERT INTO anchor_sessions (id, user_id, access_token_hash, refresh_token_hash, created_at, updated_at, access_expires_at, refresh_expires_at, revoked_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)"
+  )
+    .bind(
+      randomUserId(),
+      userId,
+      accessTokenHash,
+      refreshTokenHash,
+      createdAt,
+      createdAt,
+      accessExpiresAt,
+      refreshExpiresAt
+    )
+    .run();
+
+  return {
+    accessToken,
+    refreshToken,
+    accessExpiresIn: ANCHOR_ACCESS_TOKEN_TTL_SEC,
+  };
+}
+
+export async function getAnchorSessionByAccessToken(
+  env: AuthEnv,
+  accessToken: string
+): Promise<AnchorSessionLookup | null> {
+  const accessTokenHash = await hashOpaqueToken(accessToken);
+  const row = await env.DB.prepare(
+    "SELECT id, user_id FROM anchor_sessions WHERE access_token_hash = ? AND revoked_at IS NULL AND access_expires_at > ?"
+  )
+    .bind(accessTokenHash, nowSec())
+    .first<{ id: string; user_id: string }>();
+
+  if (!row) return null;
+  return { sessionId: row.id, userId: row.user_id };
+}
+
+export async function ensureAnchorSessionStorageReady(env: AuthEnv): Promise<void> {
+  await env.DB.prepare("SELECT id FROM anchor_sessions LIMIT 1").first<{ id: string }>();
+}
+
+export async function rotateAnchorRefreshSession(
+  env: AuthEnv,
+  refreshToken: string
+): Promise<AnchorSessionRefreshResult | null> {
+  const newAccessToken = randomOpaqueToken();
+  const newRefreshToken = randomOpaqueToken();
+  const [previousRefreshTokenHash, nextAccessTokenHash, nextRefreshTokenHash] = await Promise.all([
+    hashOpaqueToken(refreshToken),
+    hashOpaqueToken(newAccessToken),
+    hashOpaqueToken(newRefreshToken),
+  ]);
+  const updatedAt = Date.now();
+  const rotatedAtSec = nowSec();
+  const accessExpiresAt = rotatedAtSec + ANCHOR_ACCESS_TOKEN_TTL_SEC;
+  const refreshExpiresAt = rotatedAtSec + ANCHOR_REFRESH_TOKEN_TTL_SEC;
+
+  const row = await env.DB.prepare(
+    "UPDATE anchor_sessions SET access_token_hash = ?, refresh_token_hash = ?, updated_at = ?, access_expires_at = ?, refresh_expires_at = ? WHERE refresh_token_hash = ? AND revoked_at IS NULL AND refresh_expires_at > ? RETURNING id, user_id, access_token_hash, refresh_token_hash, created_at, updated_at, access_expires_at, refresh_expires_at, revoked_at"
+  )
+    .bind(
+      nextAccessTokenHash,
+      nextRefreshTokenHash,
+      updatedAt,
+      accessExpiresAt,
+      refreshExpiresAt,
+      previousRefreshTokenHash,
+      rotatedAtSec
+    )
+    .first<AnchorSessionRow>();
+
+  if (!row) return null;
+  return {
+    userId: row.user_id,
+    accessToken: newAccessToken,
+    refreshToken: newRefreshToken,
+    accessExpiresIn: Math.max(row.access_expires_at - rotatedAtSec, 0),
+  };
 }

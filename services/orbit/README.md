@@ -25,10 +25,10 @@ Orbit 期望其 auth endpoints 签发的 passkey session JWT：
 - `Authorization: Bearer <jwt>` header，或
 - `?token=<jwt>` query param（用于浏览器）
 
-对于 Anchor service-to-service auth，请设置 `CODEX_REMOTE_ANCHOR_JWT_SECRET`，并使用包含以下字段的 JWT：
+对于 Anchor 连接，Orbit 期望 `/auth/device/token` 与 `/auth/device/refresh` 签发的 opaque device token：
 
-- `iss: "codex-remote-anchor"`
-- `aud: "codex-remote-orbit-anchor"`
+- `wss://.../ws/anchor?token=<anchorAccessToken>`
+- provider 侧刷新入口：`POST /auth/device/refresh`
 
 ## D1 配置
 

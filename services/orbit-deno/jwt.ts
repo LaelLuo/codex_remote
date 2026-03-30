@@ -59,27 +59,12 @@ export async function verifyAnchorAnyToken(
   store: KvStore,
   token: string,
 ): Promise<{ sub: string } | null> {
+  void settings;
   const opaque = await store.verifyAnchorAccessToken(token);
   if (opaque) {
     return { sub: opaque.userId };
   }
-
-  if (!settings.anchorJwtSecret) {
-    return null;
-  }
-
-  try {
-    const { payload } = await jwtVerify(token, new TextEncoder().encode(settings.anchorJwtSecret), {
-      issuer: "codex-remote-anchor",
-      audience: "codex-remote-orbit-anchor",
-    });
-    if (typeof payload.sub !== "string") {
-      return null;
-    }
-    return { sub: payload.sub };
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 export async function createTotpSetupToken(settings: Settings, payload: TotpSetupPayload): Promise<string> {

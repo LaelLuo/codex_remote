@@ -20,7 +20,6 @@
 
 - 主路径：device-code（`/auth/device/code` -> `/auth/device/authorise` -> `/auth/device/token`）
 - Anchor 获取 `anchorAccessToken` + `anchorRefreshToken`，并通过 `/auth/device/refresh` 刷新
-- 为向后兼容保留 legacy JWT secret flow
 - 凭据保存到 `~/.codex-remote/credentials.json`，权限为 `0600`
 
 ### 本地 Anchor WebSocket 防护
@@ -54,13 +53,13 @@
 - web token 存储在 `localStorage`；设备被攻破会导致会话被攻破
 - WebSocket query string token（`?token=`）可能进入基础设施日志
 - web client 与 Anchor 之间没有端到端 E2E 加密（TLS 在 edge/backend 终止）
-- Anchor credentials 文件以 plaintext 保存敏感 tokens/secrets
+- Anchor credentials 文件以 plaintext 保存敏感 tokens
 - 应用层未实现独立的 auth/ws endpoints rate limiting
 - localhost-origin 自动放行便于 dev，但在 shared 机器上需谨慎
 
 ## 运维建议
 
-- 定期轮换 secrets（`CODEX_REMOTE_WEB_JWT_SECRET`，以及 legacy-flow 下的 `CODEX_REMOTE_ANCHOR_JWT_SECRET`）
+- 定期轮换 secrets（例如 `CODEX_REMOTE_WEB_JWT_SECRET` 以及各 provider 的部署侧 backend secrets）
 - 设备更换或怀疑泄露时使用 `codex-remote logout`/`/auth/logout`
 - 无必要不要开启 `ANCHOR_WS_ALLOW_PUBLIC=1`
 - 不要在与 agent 的对话中提供 secrets 或私钥

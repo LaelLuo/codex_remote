@@ -73,4 +73,4 @@ Passkey 模式变量：
 - `ANCHOR_ORBIT_URL=wss://<your-fastapi-domain>/ws/anchor`
 - `AUTH_URL=https://<your-fastapi-domain>`
 
-Anchor 通过 `/auth/device/token` 获取 opaque device access token，并通过 `/auth/device/refresh` 刷新（设备端不需要共享 JWT 签名 secret）。出于向后兼容，仍接受 legacy `anchorJwtSecret` flow。
+Anchor 通过 `/auth/device/token` 获取 opaque device access token，并通过 `/auth/device/refresh` 刷新（设备端不需要共享 JWT 签名 secret）。

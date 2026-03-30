@@ -5,6 +5,12 @@ import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 
 import { timingSafeEqual } from "node:crypto";
 import type { WsClient } from "./types";
 import {
+  normalizePersistedAnchorCredentials,
+  parseDeviceAuthorisationPayload,
+  resolveOrbitWsUrl,
+  type PersistedAnchorCredentials,
+} from "./anchor-auth";
+import {
   handleAnchorReleaseInspect,
   handleAnchorReleaseStart,
   handleAnchorReleaseStatus,
@@ -22,7 +28,6 @@ import {
 
 const PORT = Number(process.env.ANCHOR_PORT ?? 8788);
 const ORBIT_URL = process.env.ANCHOR_ORBIT_URL ?? "";
-const ANCHOR_JWT_TTL_SEC = Number(process.env.ANCHOR_JWT_TTL_SEC ?? 300);
 const AUTH_URL = process.env.AUTH_URL ?? "";
 const FORCE_LOGIN = process.env.CODEX_REMOTE_FORCE_LOGIN === "1";
 const CREDENTIALS_FILE = (process.env.CODEX_REMOTE_CREDENTIALS_FILE ?? "").trim() || join(homedir(), ".codex-remote", "credentials.json");
@@ -32,10 +37,6 @@ const CONFIGURED_CODEX_EXECUTABLE = getConfiguredCodexExecutablePath(process.env
 const CODEX_EXECUTABLE = resolveCodexExecutable(process.env.CODEX_REMOTE_CODEX_PATH);
 const startedAt = Date.now();
 
-let CODEX_REMOTE_ANCHOR_JWT_SECRET =
-  process.env.CODEX_REMOTE_ANCHOR_JWT_SECRET
-  ?? process.env.DENO_ANCHOR_JWT_SECRET
-  ?? "";
 let USER_ID: string | undefined;
 let ANCHOR_ACCESS_TOKEN = "";
 let ANCHOR_REFRESH_TOKEN = "";
@@ -1067,28 +1068,6 @@ function resubscribeAllThreads(): void {
   }
 }
 
-function base64UrlEncode(bytes: Uint8Array): string {
-  let binary = "";
-  for (let i = 0; i < bytes.length; i += 1) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-
-async function signJwtHs256(payload: Record<string, unknown>, secret: string): Promise<string> {
-  const header = { alg: "HS256", typ: "JWT" };
-  const encoder = new TextEncoder();
-  const headerPart = base64UrlEncode(encoder.encode(JSON.stringify(header)));
-  const payloadPart = base64UrlEncode(encoder.encode(JSON.stringify(payload)));
-  const data = encoder.encode(`${headerPart}.${payloadPart}`);
-  const key = await crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, [
-    "sign",
-  ]);
-  const signature = new Uint8Array(await crypto.subtle.sign("HMAC", key, data));
-  const signaturePart = base64UrlEncode(signature);
-  return `${headerPart}.${payloadPart}.${signaturePart}`;
-}
-
 async function refreshAnchorAccessToken(): Promise<boolean> {
   if (!AUTH_URL || !ANCHOR_REFRESH_TOKEN) return false;
   try {
@@ -1124,7 +1103,6 @@ async function refreshAnchorAccessToken(): Promise<boolean> {
         anchorAccessToken: ANCHOR_ACCESS_TOKEN,
         anchorRefreshToken: ANCHOR_REFRESH_TOKEN,
         anchorAccessExpiresAtMs: ANCHOR_ACCESS_EXPIRES_AT_MS,
-        anchorJwtSecret: CODEX_REMOTE_ANCHOR_JWT_SECRET || undefined,
       });
     }
 
@@ -1541,43 +1519,34 @@ async function ensureAnchorAccessToken(): Promise<boolean> {
   return await refreshAnchorAccessToken();
 }
 
-async function buildOrbitUrl(): Promise<string | null> {
-  if (!ORBIT_URL) return null;
-  try {
-    const url = new URL(ORBIT_URL);
-    if (ANCHOR_ACCESS_TOKEN) {
-      const ready = await ensureAnchorAccessToken();
-      if (ready || !CODEX_REMOTE_ANCHOR_JWT_SECRET) {
-        url.searchParams.set("token", ANCHOR_ACCESS_TOKEN);
-        return url.toString();
-      }
-    }
-    if (CODEX_REMOTE_ANCHOR_JWT_SECRET) {
-      const now = Math.floor(Date.now() / 1000);
-      const token = await signJwtHs256(
-        {
-          iss: "codex-remote-anchor",
-          aud: "codex-remote-orbit-anchor",
-          sub: USER_ID,
-          iat: now,
-          exp: now + ANCHOR_JWT_TTL_SEC,
-        },
-        CODEX_REMOTE_ANCHOR_JWT_SECRET
-      );
-      url.searchParams.set("token", token);
-    }
-    return url.toString();
-  } catch (err) {
-    console.error("[anchor] invalid ANCHOR_ORBIT_URL", err);
-    return null;
-  }
-}
-
 type OrbitPreflightResult =
   | { ok: true }
   | { ok: false; kind: "auth"; detail: string }
   | { ok: false; kind: "config"; detail: string }
   | { ok: false; kind: "network"; detail: string };
+
+type OrbitConnectionUrlResult =
+  | { ok: true; url: string }
+  | { ok: false; kind: "auth"; detail: string }
+  | { ok: false; kind: "config"; detail: string };
+
+async function resolveOrbitConnectionUrl(): Promise<OrbitConnectionUrlResult> {
+  if (!ORBIT_URL) {
+    return { ok: false, kind: "config", detail: "invalid ANCHOR_ORBIT_URL" };
+  }
+
+  const ready = await ensureAnchorAccessToken();
+  if (!ready) {
+    return { ok: false, kind: "auth", detail: "missing anchor access token" };
+  }
+
+  return resolveOrbitWsUrl(ORBIT_URL, ANCHOR_ACCESS_TOKEN);
+}
+
+async function buildOrbitUrl(): Promise<string | null> {
+  const resolved = await resolveOrbitConnectionUrl();
+  return resolved.ok ? resolved.url : null;
+}
 
 function toHttpPreflightUrl(input: string): string | null {
   try {
@@ -1594,11 +1563,11 @@ function toHttpPreflightUrl(input: string): string | null {
 async function preflightOrbitConnection(): Promise<OrbitPreflightResult> {
   if (!ORBIT_URL) return { ok: true };
 
-  const orbitUrl = await buildOrbitUrl();
-  if (!orbitUrl) {
-    return { ok: false, kind: "config", detail: "invalid ANCHOR_ORBIT_URL" };
+  const orbitUrl = await resolveOrbitConnectionUrl();
+  if (!orbitUrl.ok) {
+    return orbitUrl;
   }
-  const preflightUrl = toHttpPreflightUrl(orbitUrl);
+  const preflightUrl = toHttpPreflightUrl(orbitUrl.url);
   if (!preflightUrl) {
     return { ok: false, kind: "config", detail: "ANCHOR_ORBIT_URL must be ws://, wss://, http:// or https://" };
   }
@@ -1831,41 +1800,11 @@ async function streamLines(
   if (tail.length > 0) onLine(tail);
 }
 
-interface Credentials {
-  userId?: string;
-  anchorId?: string;
-  anchorJwtSecret?: string;
-  anchorAccessToken?: string;
-  anchorRefreshToken?: string;
-  anchorAccessExpiresAtMs?: number;
-}
-
-async function loadCredentials(): Promise<Credentials | null> {
+async function loadCredentials(): Promise<PersistedAnchorCredentials | null> {
   if (!CREDENTIALS_FILE) return null;
   try {
     const text = await Bun.file(CREDENTIALS_FILE).text();
-    const data = JSON.parse(text) as Partial<Credentials>;
-    const userId = typeof data.userId === "string" && data.userId.trim() ? data.userId : undefined;
-
-    if (data.anchorAccessToken && data.anchorRefreshToken) {
-      return {
-        userId,
-        anchorId: typeof data.anchorId === "string" ? data.anchorId : undefined,
-        anchorAccessToken: data.anchorAccessToken,
-        anchorRefreshToken: data.anchorRefreshToken,
-        anchorAccessExpiresAtMs:
-          typeof data.anchorAccessExpiresAtMs === "number" ? data.anchorAccessExpiresAtMs : undefined,
-        anchorJwtSecret: data.anchorJwtSecret,
-      };
-    }
-
-    if (data.anchorJwtSecret && userId) {
-      return {
-        userId,
-        anchorId: typeof data.anchorId === "string" ? data.anchorId : undefined,
-        anchorJwtSecret: data.anchorJwtSecret,
-      };
-    }
+    return JSON.parse(text) as PersistedAnchorCredentials;
   } catch {
     // File doesn't exist or is invalid
   }
@@ -1891,7 +1830,7 @@ function tryOpenBrowser(url: string): void {
   }
 }
 
-async function saveCredentials(creds: Credentials): Promise<void> {
+async function saveCredentials(creds: PersistedAnchorCredentials): Promise<void> {
   if (!CREDENTIALS_FILE) return;
   try {
     await mkdir(dirname(CREDENTIALS_FILE), { recursive: true });
@@ -2054,49 +1993,32 @@ async function deviceLogin(): Promise<boolean> {
         continue;
       }
 
-      const tokenData = (await tokenRes.json()) as {
-        status: "pending" | "authorised" | "expired";
-        userId?: string;
-        anchorJwtSecret?: string;
-        anchorAccessToken?: string;
-        anchorRefreshToken?: string;
-        anchorAccessExpiresIn?: number;
-      };
+      const tokenData = (await tokenRes.json()) as Record<string, unknown>;
 
       if (tokenData.status === "pending") continue;
 
-      if (tokenData.status === "authorised" && tokenData.userId) {
-        USER_ID = tokenData.userId;
-
-        if (tokenData.anchorAccessToken && tokenData.anchorRefreshToken && typeof tokenData.anchorAccessExpiresIn === "number") {
-          ANCHOR_ACCESS_TOKEN = tokenData.anchorAccessToken;
-          ANCHOR_REFRESH_TOKEN = tokenData.anchorRefreshToken;
-          ANCHOR_ACCESS_EXPIRES_AT_MS = Date.now() + tokenData.anchorAccessExpiresIn * 1000;
-          await saveCredentials({
-            userId: USER_ID,
-            anchorId: ANCHOR_ID || undefined,
-            anchorAccessToken: ANCHOR_ACCESS_TOKEN,
-            anchorRefreshToken: ANCHOR_REFRESH_TOKEN,
-            anchorAccessExpiresAtMs: ANCHOR_ACCESS_EXPIRES_AT_MS,
-            anchorJwtSecret: CODEX_REMOTE_ANCHOR_JWT_SECRET || undefined,
-          });
-          console.log("  \x1b[32mAuthorised!\x1b[0m Device tokens saved.\n");
-          return true;
-        }
-
-        if (tokenData.anchorJwtSecret) {
-          CODEX_REMOTE_ANCHOR_JWT_SECRET = tokenData.anchorJwtSecret;
-          await saveCredentials({
-            userId: USER_ID,
-            anchorId: ANCHOR_ID || undefined,
-            anchorJwtSecret: CODEX_REMOTE_ANCHOR_JWT_SECRET,
-          });
-          console.log("  \x1b[32mAuthorised!\x1b[0m Credentials saved.\n");
-          return true;
-        }
+      const authorised = parseDeviceAuthorisationPayload(tokenData);
+      if (authorised) {
+        USER_ID = authorised.userId;
+        ANCHOR_ACCESS_TOKEN = authorised.anchorAccessToken;
+        ANCHOR_REFRESH_TOKEN = authorised.anchorRefreshToken;
+        ANCHOR_ACCESS_EXPIRES_AT_MS = Date.now() + authorised.anchorAccessExpiresIn * 1000;
+        await saveCredentials({
+          userId: USER_ID,
+          anchorId: ANCHOR_ID || undefined,
+          anchorAccessToken: ANCHOR_ACCESS_TOKEN,
+          anchorRefreshToken: ANCHOR_REFRESH_TOKEN,
+          anchorAccessExpiresAtMs: ANCHOR_ACCESS_EXPIRES_AT_MS,
+        });
+        console.log("  \x1b[32mAuthorised!\x1b[0m Device tokens saved.\n");
+        return true;
       }
 
-      // expired
+      if (tokenData.status === "authorised") {
+        console.error("  Device authorisation response did not include access/refresh tokens.");
+        return false;
+      }
+
       console.error("  Code expired. Run 'codex-remote login' to try again.");
       return false;
     }
@@ -2191,17 +2113,12 @@ const server = Bun.serve({
 ensureAppServer();
 
 async function startup() {
-  const saved = await loadCredentials();
-  if (saved) {
-    CODEX_REMOTE_ANCHOR_JWT_SECRET = saved.anchorJwtSecret ?? CODEX_REMOTE_ANCHOR_JWT_SECRET;
-    ANCHOR_ACCESS_TOKEN = saved.anchorAccessToken ?? "";
-    ANCHOR_REFRESH_TOKEN = saved.anchorRefreshToken ?? "";
-    ANCHOR_ACCESS_EXPIRES_AT_MS = saved.anchorAccessExpiresAtMs ?? 0;
-    if (saved.userId) {
-      USER_ID = saved.userId;
-    }
-    ANCHOR_ID = saved.anchorId ?? "";
-  }
+  const saved = normalizePersistedAnchorCredentials(await loadCredentials());
+  ANCHOR_ACCESS_TOKEN = saved.anchorAccessToken;
+  ANCHOR_REFRESH_TOKEN = saved.anchorRefreshToken;
+  ANCHOR_ACCESS_EXPIRES_AT_MS = saved.anchorAccessExpiresAtMs;
+  USER_ID = saved.userId;
+  ANCHOR_ID = saved.anchorId ?? "";
 
   if (!ANCHOR_ID) {
     ANCHOR_ID = crypto.randomUUID();
@@ -2212,14 +2129,12 @@ async function startup() {
         anchorAccessToken: ANCHOR_ACCESS_TOKEN || undefined,
         anchorRefreshToken: ANCHOR_REFRESH_TOKEN || undefined,
         anchorAccessExpiresAtMs: ANCHOR_ACCESS_EXPIRES_AT_MS || undefined,
-        anchorJwtSecret: CODEX_REMOTE_ANCHOR_JWT_SECRET || undefined,
       });
     }
   }
 
-  const hasDeviceTokens = Boolean(ANCHOR_ACCESS_TOKEN && ANCHOR_REFRESH_TOKEN);
-  const hasLegacySecret = Boolean(CODEX_REMOTE_ANCHOR_JWT_SECRET && USER_ID);
-  const needsLogin = ORBIT_URL && (FORCE_LOGIN || (!hasDeviceTokens && !hasLegacySecret));
+  const hasDeviceTokens = saved.hasDeviceTokens;
+  const needsLogin = ORBIT_URL && (FORCE_LOGIN || !hasDeviceTokens);
 
   console.log(`\nCodex Remote Anchor`);
   console.log(`  Local:     http://localhost:${server.port}`);

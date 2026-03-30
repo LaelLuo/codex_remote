@@ -17,8 +17,10 @@ import type { ChallengeRecord, DeviceCodeRecord, StoredCredential, StoredUser } 
 import { authCorsHeaders, base64UrlDecode, base64UrlEncode, getRpId, isAllowedOrigin } from "./utils";
 import { createSession, refreshSession, verifySession } from "./session";
 import {
+  createAnchorSession,
   consumeTotpStep,
   createUser,
+  ensureAnchorSessionStorageReady,
   getCredential,
   getTotpFactorByUserId,
   getUserById,
@@ -27,6 +29,7 @@ import {
   listCredentials,
   randomUserId,
   revokeSession,
+  rotateAnchorRefreshSession,
   updateCounter,
   upsertTotpFactor,
   upsertCredential,
@@ -99,7 +102,6 @@ interface TotpSetupPayload {
   userId?: string;
 }
 
-const ANCHOR_ACCESS_TOKEN_TTL_SEC = 60 * 60;
 const TOTP_SETUP_TOKEN_TTL_SEC = 10 * 60;
 const TOTP_DIGITS = 6;
 const TOTP_PERIOD_SEC = 30;
@@ -174,23 +176,6 @@ async function verifyTotpSetupToken(env: AuthEnv, token: string): Promise<TotpSe
   } catch {
     return null;
   }
-}
-
-async function createAnchorAccessToken(env: AuthEnv, userId: string): Promise<{ token: string; expiresIn: number } | null> {
-  const secret = env.CODEX_REMOTE_ANCHOR_JWT_SECRET?.trim();
-  if (!secret) return null;
-
-  const now = Math.floor(Date.now() / 1000);
-  const token = await new SignJWT({})
-    .setProtectedHeader({ alg: "HS256" })
-    .setSubject(userId)
-    .setIssuer("codex-remote-anchor")
-    .setAudience("codex-remote-orbit-anchor")
-    .setIssuedAt(now)
-    .setExpirationTime(now + ANCHOR_ACCESS_TOKEN_TTL_SEC)
-    .sign(new TextEncoder().encode(secret));
-
-  return { token, expiresIn: ANCHOR_ACCESS_TOKEN_TTL_SEC };
 }
 
 export class PasskeyChallengeStore extends DurableObject<AuthEnv> {
@@ -946,10 +931,20 @@ async function handleDeviceToken(req: Request, env: AuthEnv): Promise<Response> 
     return Response.json({ status: "pending" }, { status: 200, headers: authCorsHeaders(req, env) });
   }
 
-  // Check secret exists before consuming (so record survives retries if misconfigured)
-  const anchorSecret = env.CODEX_REMOTE_ANCHOR_JWT_SECRET?.trim();
-  if (!anchorSecret) {
-    return Response.json({ error: "Anchor secret not configured on Orbit." }, { status: 503, headers: authCorsHeaders(req, env) });
+  if (!pollData.record.userId) {
+    return Response.json(
+      { error: "Authorised device code is missing a user." },
+      { status: 500, headers: authCorsHeaders(req, env) }
+    );
+  }
+
+  try {
+    await ensureAnchorSessionStorageReady(env);
+  } catch {
+    return Response.json(
+      { error: "Anchor session storage not ready on Orbit." },
+      { status: 503, headers: authCorsHeaders(req, env) }
+    );
   }
 
   const consumeRes = await stub.fetch("https://do/device/consume", {
@@ -962,11 +957,21 @@ async function handleDeviceToken(req: Request, env: AuthEnv): Promise<Response> 
     return Response.json({ status: "expired" }, { status: 200, headers: authCorsHeaders(req, env) });
   }
 
+  if (!consumeData.record.userId) {
+    return Response.json(
+      { error: "Authorised device code is missing a user." },
+      { status: 500, headers: authCorsHeaders(req, env) }
+    );
+  }
+
+  const anchorSession = await createAnchorSession(env, consumeData.record.userId);
   return Response.json(
     {
       status: "authorised",
       userId: consumeData.record.userId,
-      anchorJwtSecret: anchorSecret,
+      anchorAccessToken: anchorSession.accessToken,
+      anchorRefreshToken: anchorSession.refreshToken,
+      anchorAccessExpiresIn: anchorSession.accessExpiresIn,
     },
     { status: 200, headers: authCorsHeaders(req, env) }
   );
@@ -1034,22 +1039,17 @@ async function handleDeviceRefresh(req: Request, env: AuthEnv): Promise<Response
     return Response.json({ error: "refreshToken is required." }, { status: 400, headers: authCorsHeaders(req, env) });
   }
 
-  const result = await refreshSession(env, body.refreshToken);
+  const result = await rotateAnchorRefreshSession(env, body.refreshToken);
   if (!result) {
     return Response.json({ error: "Invalid or expired refresh token." }, { status: 401, headers: authCorsHeaders(req, env) });
   }
 
-  const anchorAccess = await createAnchorAccessToken(env, result.user.id);
-  if (!anchorAccess) {
-    return Response.json({ error: "Anchor secret not configured on Orbit." }, { status: 503, headers: authCorsHeaders(req, env) });
-  }
-
   return Response.json(
     {
-      anchorAccessToken: anchorAccess.token,
-      anchorRefreshToken: result.tokens.refreshToken,
-      anchorAccessExpiresIn: anchorAccess.expiresIn,
-      userId: result.user.id,
+      anchorAccessToken: result.accessToken,
+      anchorRefreshToken: result.refreshToken,
+      anchorAccessExpiresIn: result.accessExpiresIn,
+      userId: result.userId,
     },
     { status: 200, headers: authCorsHeaders(req, env) }
   );

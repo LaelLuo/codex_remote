@@ -1,5 +1,6 @@
 import type { AuthResult, Env, Role } from "../types";
-import { getAuthToken, verifyOrbitAnchorJwt, verifyOrbitUserJwt } from "../utils/jwt";
+import { getAnchorSessionByAccessToken } from "../auth/db";
+import { getAuthToken, verifyOrbitUserJwt } from "../utils/jwt";
 
 export function getRoleFromPath(pathname: string): Role | null {
   const pathOnly = pathname.split("?", 1)[0]?.split("#", 1)[0] ?? "";
@@ -17,13 +18,8 @@ export async function isAuthorised(req: Request, env: Env, role: Role): Promise<
   }
 
   const userSecret = env.CODEX_REMOTE_WEB_JWT_SECRET?.trim();
-  const anchorSecret = env.CODEX_REMOTE_ANCHOR_JWT_SECRET?.trim();
   if (role === "client" && !userSecret) {
     console.error("[orbit] auth: web secret not configured, denying client request");
-    return denied;
-  }
-  if (role === "anchor" && !anchorSecret) {
-    console.error("[orbit] auth: anchor secret not configured, denying anchor request");
     return denied;
   }
 
@@ -46,13 +42,10 @@ export async function isAuthorised(req: Request, env: Env, role: Role): Promise<
     return denied;
   }
 
-  const anchor = await verifyOrbitAnchorJwt(provided, env);
-  if (anchor.ok && anchor.userId) {
-    console.log(`[orbit] auth: anchor JWT accepted, userId=${anchor.userId}`);
+  const anchor = await getAnchorSessionByAccessToken(env, provided);
+  if (anchor?.userId) {
+    console.log(`[orbit] auth: anchor access token accepted, userId=${anchor.userId}`);
     return { authorised: true, userId: anchor.userId, jwtType: "anchor" };
-  }
-  if (anchor.ok) {
-    console.warn("[orbit] auth: anchor token missing subject");
   }
 
   console.warn("[orbit] auth: anchor token rejected");

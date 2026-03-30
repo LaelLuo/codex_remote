@@ -20,12 +20,10 @@ Codex Remote 结合使用 passkey/TOTP/basic 登录（取决于 provider）、re
 
 - Anchor 在 device-code 授权后获得 `anchorAccessToken` + `anchorRefreshToken`
 - access token 通过 `/auth/device/refresh` 刷新
-- 在 legacy 场景中可使用 `CODEX_REMOTE_ANCHOR_JWT_SECRET`
 
 ### Secrets
 
 - `CODEX_REMOTE_WEB_JWT_SECRET`：用于签名/校验用户 JWT
-- `CODEX_REMOTE_ANCHOR_JWT_SECRET`：用于 Anchor 的 legacy service-to-service JWT（兼容用途）
 
 ## 主要流程
 
@@ -82,15 +80,12 @@ token 会基于 issuer/audience 以及服务端会话状态进行校验。
 
 - `wss://.../ws/anchor?token=<anchorAccessToken>`
 
-在 legacy 模式下，Anchor 可通过 `CODEX_REMOTE_ANCHOR_JWT_SECRET` 签发短期 JWT。
-
 ## 必填配置
 
 ### Orbit / Orbit Deno
 
 - `PASSKEY_ORIGIN`（passkey 模式）
 - `CODEX_REMOTE_WEB_JWT_SECRET`
-- `CODEX_REMOTE_ANCHOR_JWT_SECRET`（如果需要 legacy flow）
 
 ### FastAPI control-plane
 
@@ -104,7 +99,6 @@ token 会基于 issuer/audience 以及服务端会话状态进行校验。
 
 - `ANCHOR_ORBIT_URL`
 - `AUTH_URL`
-- 可选 `CODEX_REMOTE_ANCHOR_JWT_SECRET`（legacy）
 - 可选 `ANCHOR_APP_CWD`
 
 ## 常见问题
