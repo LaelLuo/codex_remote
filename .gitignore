@@ -37,3 +37,4 @@ services/control-plane/data/
 plans
 .playwright-cli
 output/playwright
+.superpowers/brainstorm/
