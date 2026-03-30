@@ -160,6 +160,26 @@ describe("i18n store", () => {
     expect(i18n.t("tool.title.review")).toBe("审查");
   });
 
+  test("translates account sign-in methods labels in both locales", async () => {
+    const { i18n } = await loadI18n();
+    expect(i18n.t("settings.account.title.signInMethods")).toBe("Sign-in methods");
+    expect(i18n.t("settings.account.passkey.unbound")).toBe("Not bound");
+    expect(i18n.t("settings.account.passkey.bind")).toBe("Bind passkey");
+    expect(i18n.t("settings.account.totp.rebind")).toBe("Rebind TOTP");
+    expect(i18n.t("settings.account.confirm.totpRebind")).toBe("Replace TOTP");
+    expect(i18n.t("settings.account.notice.deviceUnaffected")).toBe(
+      "Already authorized devices stay signed in.",
+    );
+
+    i18n.set("zh-CN");
+    expect(i18n.t("settings.account.title.signInMethods")).toBe("登录方式");
+    expect(i18n.t("settings.account.passkey.unbound")).toBe("未绑定");
+    expect(i18n.t("settings.account.passkey.bind")).toBe("绑定通行密钥");
+    expect(i18n.t("settings.account.totp.rebind")).toBe("重绑 TOTP");
+    expect(i18n.t("settings.account.confirm.totpRebind")).toBe("替换 TOTP");
+    expect(i18n.t("settings.account.notice.deviceUnaffected")).toBe("已授权设备不会被自动下线。");
+  });
+
   test("translates project picker and worktree modal labels", async () => {
     const { i18n } = await loadI18n();
     expect(i18n.t("projectPicker.browseDirectories")).toBe("Browse directories");

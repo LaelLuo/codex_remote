@@ -190,4 +190,77 @@ describe("totp integration", () => {
     );
     expect(secondLogin.status).toBe(400);
   });
+
+  test("logged-in user can rebind totp and invalidate the old factor", async () => {
+    const env = createTestEnv();
+    const t0 = Math.floor(Date.now() / 30_000) * 30_000 + 240_000;
+
+    const startResponse = await callAuth(env, "/auth/register/totp/start", {
+      method: "POST",
+      payload: { name: "carol" },
+    });
+    expect(startResponse.status).toBe(200);
+    const startData = (await startResponse.json()) as { setupToken: string; secret: string };
+
+    const registerCode = await generateTotpCode(startData.secret, { nowMs: t0, digits: 6, periodSec: 30 });
+    const verifyResponse = await withNow(t0, async () =>
+      await callAuth(env, "/auth/register/totp/verify", {
+        method: "POST",
+        payload: { setupToken: startData.setupToken, code: registerCode },
+      })
+    );
+    expect(verifyResponse.status).toBe(200);
+    const verifyData = (await verifyResponse.json()) as { token: string };
+    expect(verifyData.token.length).toBeGreaterThan(10);
+
+    const rebindStartAt = t0 + 30_000;
+    const rebindStartResponse = await withNow(rebindStartAt, async () =>
+      await callAuth(env, "/auth/totp/setup/options", {
+        method: "POST",
+        token: verifyData.token,
+        payload: {},
+      })
+    );
+    expect(rebindStartResponse.status).toBe(200);
+    const rebindStartData = (await rebindStartResponse.json()) as { setupToken: string; secret: string };
+    expect(rebindStartData.setupToken.length).toBeGreaterThan(10);
+    expect(rebindStartData.secret).toMatch(/^[A-Z2-7]+$/);
+
+    const rebindVerifyAt = rebindStartAt + 30_000;
+    const rebindCode = await generateTotpCode(rebindStartData.secret, {
+      nowMs: rebindVerifyAt,
+      digits: 6,
+      periodSec: 30,
+    });
+    const rebindVerifyResponse = await withNow(rebindVerifyAt, async () =>
+      await callAuth(env, "/auth/totp/setup/verify", {
+        method: "POST",
+        token: verifyData.token,
+        payload: { setupToken: rebindStartData.setupToken, code: rebindCode },
+      })
+    );
+    expect(rebindVerifyResponse.status).toBe(200);
+    const rebindVerifyData = (await rebindVerifyResponse.json()) as { verified: boolean; hasTotp: boolean };
+    expect(rebindVerifyData.verified).toBe(true);
+    expect(rebindVerifyData.hasTotp).toBe(true);
+
+    const oldLoginAt = rebindVerifyAt + 30_000;
+    const oldCode = await generateTotpCode(startData.secret, { nowMs: oldLoginAt, digits: 6, periodSec: 30 });
+    const oldLoginResponse = await withNow(oldLoginAt, async () =>
+      await callAuth(env, "/auth/login/totp", {
+        method: "POST",
+        payload: { username: "carol", code: oldCode },
+      })
+    );
+    expect(oldLoginResponse.status).toBe(400);
+
+    const newCode = await generateTotpCode(rebindStartData.secret, { nowMs: oldLoginAt, digits: 6, periodSec: 30 });
+    const newLoginResponse = await withNow(oldLoginAt, async () =>
+      await callAuth(env, "/auth/login/totp", {
+        method: "POST",
+        payload: { username: "carol", code: newCode },
+      })
+    );
+    expect(newLoginResponse.status).toBe(200);
+  });
 });

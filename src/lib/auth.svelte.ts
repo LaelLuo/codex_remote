@@ -30,6 +30,8 @@ function isLocalMode(): boolean {
 
 type AuthStatus = "loading" | "signed_out" | "signed_in" | "needs_setup";
 export type AuthMethod = "passkey" | "totp";
+export type AccountTotpFlow = "idle" | "confirm_rebind" | "setting_up";
+export type AccountTotpMode = "bind" | "rebind" | null;
 
 interface AuthUser {
   id: string;
@@ -128,11 +130,14 @@ function decodeJwtPayload(token: string): { exp?: number } | null {
   }
 }
 
-class AuthStore {
+export class AuthStore {
   status = $state<AuthStatus>("loading");
   hasPasskey = $state(false);
   hasTotp = $state(false);
   totpSetup = $state<TotpSetupState | null>(null);
+  accountTotpFlow = $state<AccountTotpFlow>("idle");
+  accountTotpMode = $state<AccountTotpMode>(null);
+  accountNotice = $state<StoreMessage | null>(null);
   token = $state<string | null>(null);
   user = $state<AuthUser | null>(null);
   busy = $state(false);
@@ -156,6 +161,8 @@ class AuthStore {
     this.status = "loading";
     this.#clearError();
     this.totpSetup = null;
+    this.accountTotpFlow = "idle";
+    this.accountTotpMode = null;
 
     // Local mode: skip all auth for trusted networks (e.g., Tailscale)
     if (isLocalMode()) {
@@ -470,6 +477,133 @@ class AuthStore {
     this.totpSetup = null;
   }
 
+  requestAccountTotpRebind(): void {
+    if (this.busy || this.status !== "signed_in" || !this.user || !this.hasTotp) return;
+    this.#clearError();
+    this.accountNotice = null;
+    this.totpSetup = null;
+    this.accountTotpFlow = "confirm_rebind";
+    this.accountTotpMode = "rebind";
+  }
+
+  async beginAccountTotpSetup(): Promise<boolean> {
+    return await this.#beginAccountTotpSetup("bind");
+  }
+
+  async confirmAccountTotpRebind(): Promise<boolean> {
+    if (this.accountTotpFlow !== "confirm_rebind") return false;
+    return await this.#beginAccountTotpSetup("rebind");
+  }
+
+  async completeAccountTotpSetup(code: string): Promise<void> {
+    if (this.busy) return;
+    if (!this.totpSetup) {
+      this.#setErrorKey("auth.error.totpSetupMissing");
+      return;
+    }
+
+    this.busy = true;
+    this.#clearError();
+    this.accountNotice = null;
+    const mode = this.accountTotpMode ?? "bind";
+    try {
+      const response = await fetch(apiUrl("/auth/totp/setup/verify"), {
+        method: "POST",
+        headers: { "content-type": "application/json", ...this.#authHeaders() },
+        body: JSON.stringify({ setupToken: this.totpSetup.setupToken, code }),
+      });
+      const data = await parseResponse<{ verified?: boolean; hasTotp?: boolean; error?: string }>(response);
+      if (!response.ok || !data?.verified) {
+        if (data?.error) {
+          this.#setErrorText(data.error);
+        } else {
+          this.#setErrorKey("auth.error.registrationFailed");
+        }
+        return;
+      }
+
+      this.hasTotp = true;
+      this.totpSetup = null;
+      this.accountTotpFlow = "idle";
+      this.accountTotpMode = null;
+      this.accountNotice = {
+        kind: "key",
+        key: mode === "rebind" ? "settings.account.notice.totpRebound" : "settings.account.notice.totpBound",
+      };
+      void this.#syncSessionFlags();
+    } catch (err) {
+      if (err instanceof Error) {
+        this.#setErrorText(err.message);
+      } else {
+        this.#setErrorKey("auth.error.registrationFailed");
+      }
+    } finally {
+      this.busy = false;
+    }
+  }
+
+  cancelAccountTotpSetup(): void {
+    this.totpSetup = null;
+    this.accountTotpFlow = "idle";
+    this.accountTotpMode = null;
+  }
+
+  clearAccountNotice(): void {
+    this.accountNotice = null;
+  }
+
+  async addPasskeyForCurrentUser(): Promise<void> {
+    if (this.busy || this.status !== "signed_in" || !this.user) return;
+    this.busy = true;
+    this.#clearError();
+    this.accountNotice = null;
+
+    try {
+      const optionsResponse = await fetch(apiUrl("/auth/register/options"), {
+        method: "POST",
+        headers: { "content-type": "application/json", ...this.#authHeaders() },
+        body: JSON.stringify({ name: this.user.name, displayName: this.user.name }),
+      });
+      const options = await parseResponse<RegisterOptionsResponse>(optionsResponse);
+      if (!optionsResponse.ok || !options || options.error) {
+        if (options?.error) {
+          this.#setErrorText(options.error);
+        } else {
+          this.#setErrorKey("auth.error.unableToStartRegistration");
+        }
+        return;
+      }
+
+      const credential = await startRegistration({ optionsJSON: options });
+      const verifyResponse = await fetch(apiUrl("/auth/register/verify"), {
+        method: "POST",
+        headers: { "content-type": "application/json", ...this.#authHeaders() },
+        body: JSON.stringify({ credential }),
+      });
+      const verify = await parseResponse<AuthVerifyResponse & { error?: string }>(verifyResponse);
+      if (!verifyResponse.ok || !verify?.token) {
+        if (verify?.error) {
+          this.#setErrorText(verify.error);
+        } else {
+          this.#setErrorKey("auth.error.registrationFailed");
+        }
+        return;
+      }
+
+      this.#applySession(verify);
+      this.hasPasskey = true;
+      this.accountNotice = { kind: "key", key: "settings.account.notice.passkeyBound" };
+    } catch (err) {
+      if (err instanceof Error) {
+        this.#setErrorText(err.message);
+      } else {
+        this.#setErrorKey("auth.error.registrationCancelled");
+      }
+    } finally {
+      this.busy = false;
+    }
+  }
+
   async signOut(): Promise<void> {
     try {
       if (this.token) {
@@ -486,6 +620,9 @@ class AuthStore {
     this.hasPasskey = false;
     this.hasTotp = false;
     this.totpSetup = null;
+    this.accountTotpFlow = "idle";
+    this.accountTotpMode = null;
+    this.accountNotice = null;
     this.status = "signed_out";
     this.#clearError();
     this.#clearToken();
@@ -652,6 +789,59 @@ class AuthStore {
       this.hasTotp = Boolean(data.hasTotp);
     } catch {
       // ignore best-effort update
+    }
+  }
+
+  async #beginAccountTotpSetup(mode: Exclude<AccountTotpMode, null>): Promise<boolean> {
+    if (this.busy || this.status !== "signed_in" || !this.user) return false;
+    this.busy = true;
+    this.#clearError();
+    this.accountNotice = null;
+    this.totpSetup = null;
+    this.accountTotpFlow = "setting_up";
+    this.accountTotpMode = mode;
+
+    try {
+      const response = await fetch(apiUrl("/auth/totp/setup/options"), {
+        method: "POST",
+        headers: { "content-type": "application/json", ...this.#authHeaders() },
+        body: JSON.stringify({}),
+      });
+      const data = await parseResponse<TotpSetupResponse>(response);
+      if (!response.ok || !data?.setupToken || !data.secret || !data.otpauthUrl) {
+        if (data?.error) {
+          this.#setErrorText(data.error);
+        } else {
+          this.#setErrorKey("auth.error.unableToStartTotpSetup");
+        }
+        this.accountTotpFlow = "idle";
+        this.accountTotpMode = null;
+        this.totpSetup = null;
+        return false;
+      }
+
+      this.totpSetup = {
+        setupToken: data.setupToken,
+        secret: data.secret,
+        otpauthUrl: data.otpauthUrl,
+        issuer: data.issuer ?? i18n.t("landing.title"),
+        digits: data.digits ?? 6,
+        period: data.period ?? 30,
+        username: this.user.name,
+      };
+      return true;
+    } catch (err) {
+      if (err instanceof Error) {
+        this.#setErrorText(err.message);
+      } else {
+        this.#setErrorKey("auth.error.unableToStartTotpSetup");
+      }
+      this.accountTotpFlow = "idle";
+      this.accountTotpMode = null;
+      this.totpSetup = null;
+      return false;
+    } finally {
+      this.busy = false;
     }
   }
 }

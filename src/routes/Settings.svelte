@@ -1,5 +1,7 @@
 <script lang="ts">
+  import QRCode from "qrcode";
   import { auth } from "../lib/auth.svelte";
+  import { buildAccountAuthCardModel } from "../lib/account-auth-card";
   import { theme } from "../lib/theme.svelte";
   import { i18n, type Locale, type TranslationParams } from "../lib/i18n.svelte";
   import { config } from "../lib/config.svelte";
@@ -43,6 +45,8 @@
     | { kind: "key"; key: string; params?: TranslationParams }
     | { kind: "text"; text: string };
 
+  type MessageLike = UiMessage | { kind: "key"; key: string; params?: TranslationParams } | { kind: "text"; text: string } | null;
+
   let codexConfigPath = $state("");
   let codexConfigCandidates = $state<string[]>([]);
   let codexConfigPlatform = $state("");
@@ -54,8 +58,23 @@
   let codexConfigError = $state<UiMessage | null>(null);
   let codexConfigInfo = $state<UiMessage | null>(null);
   let codexConfigLoadedFor = $state<string | null>(null);
+  let accountTotpCode = $state("");
+  let accountTotpQrDataUrl = $state("");
 
-  function toMessageText(message: UiMessage | null): string {
+  const accountAuthCard = $derived.by(() =>
+    buildAccountAuthCardModel({
+      hasPasskey: auth.hasPasskey,
+      hasTotp: auth.hasTotp,
+      accountTotpFlow: auth.accountTotpFlow,
+      accountNotice: auth.accountNotice,
+    }),
+  );
+  const accountRowActionsDisabled = $derived(auth.busy || auth.accountTotpFlow !== "idle");
+  const accountTotpSubmitKey = $derived(
+    auth.accountTotpMode === "rebind" ? "settings.account.totp.rebind" : "settings.account.totp.bind",
+  );
+
+  function toMessageText(message: MessageLike): string {
     if (!message) return "";
     if (message.kind === "text") return message.text;
     return i18n.t(message.key, message.params);
@@ -241,6 +260,51 @@
   function startReleasePolling() {
     releaseCockpit.startPolling(resolveAnchorIdForRelease());
   }
+
+  async function handleAccountTotpSubmit() {
+    const code = accountTotpCode.trim();
+    if (!code) return;
+    await auth.completeAccountTotpSetup(code);
+  }
+
+  function resetAccountTotpUi() {
+    accountTotpCode = "";
+    accountTotpQrDataUrl = "";
+  }
+
+  $effect(() => {
+    if (!auth.totpSetup?.otpauthUrl || auth.accountTotpFlow !== "setting_up") {
+      accountTotpQrDataUrl = "";
+      return;
+    }
+
+    let cancelled = false;
+    void QRCode.toDataURL(auth.totpSetup.otpauthUrl, {
+      width: 220,
+      margin: 1,
+    })
+      .then((value) => {
+        if (!cancelled) accountTotpQrDataUrl = value;
+      })
+      .catch(() => {
+        if (!cancelled) accountTotpQrDataUrl = "";
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  });
+
+  $effect(() => {
+    if (auth.totpSetup) return;
+    accountTotpCode = "";
+  });
+
+  $effect(() => {
+    return () => {
+      auth.clearAccountNotice();
+    };
+  });
 
 </script>
 
@@ -502,6 +566,147 @@
           <span class="section-title">{i18n.t("settings.section.account")}</span>
         </div>
         <div class="section-body stack">
+          <div class="account-card stack">
+            <div class="account-card-header stack">
+              <div class="account-card-title-row">
+                <div class="stack account-card-title-block">
+                  <span class="account-card-title">{i18n.t(accountAuthCard.titleKey)}</span>
+                  <p class="hint account-scope-hint">{i18n.t("settings.account.hint.signInMethodsScope")}</p>
+                </div>
+                {#if auth.user}
+                  <span class="account-username">{auth.user.name}</span>
+                {/if}
+              </div>
+            </div>
+
+            <div class="account-method-list">
+              <div class="account-method-row">
+                <div class="account-method-copy">
+                  <span class="account-method-label">{i18n.t("auth.login.method.passkey")}</span>
+                  <span class="account-method-status">{i18n.t(accountAuthCard.passkey.statusKey)}</span>
+                </div>
+                {#if accountAuthCard.passkey.actionKey}
+                  <button
+                    class="action-btn"
+                    type="button"
+                    onclick={() => void auth.addPasskeyForCurrentUser()}
+                    disabled={accountRowActionsDisabled}
+                  >
+                    {i18n.t(accountAuthCard.passkey.actionKey)}
+                  </button>
+                {/if}
+              </div>
+
+              <div class="account-method-row">
+                <div class="account-method-copy">
+                  <span class="account-method-label">{i18n.t("auth.login.method.totp")}</span>
+                  <span class="account-method-status">{i18n.t(accountAuthCard.totp.statusKey)}</span>
+                </div>
+                {#if accountAuthCard.totp.actionKey}
+                  <button
+                    class="action-btn"
+                    type="button"
+                    onclick={() => {
+                      if (auth.hasTotp) {
+                        auth.requestAccountTotpRebind();
+                        return;
+                      }
+                      void auth.beginAccountTotpSetup();
+                    }}
+                    disabled={accountRowActionsDisabled}
+                  >
+                    {i18n.t(accountAuthCard.totp.actionKey)}
+                  </button>
+                {/if}
+              </div>
+            </div>
+
+            {#if accountAuthCard.confirmation}
+              <div class="account-callout account-callout-warning stack">
+                <strong>{i18n.t(accountAuthCard.confirmation.titleKey)}</strong>
+                <p class="hint">{i18n.t(accountAuthCard.confirmation.detailKey)}</p>
+                <p class="hint">{i18n.t(accountAuthCard.confirmation.noteKey)}</p>
+                <div class="row account-callout-actions">
+                  <button
+                    class="action-btn"
+                    type="button"
+                    onclick={() => void auth.confirmAccountTotpRebind()}
+                    disabled={auth.busy}
+                  >
+                    {i18n.t("settings.account.totp.rebind")}
+                  </button>
+                  <button
+                    class="action-btn"
+                    type="button"
+                    onclick={() => {
+                      auth.cancelAccountTotpSetup();
+                      resetAccountTotpUi();
+                    }}
+                    disabled={auth.busy}
+                  >
+                    {i18n.t("common.cancel")}
+                  </button>
+                </div>
+              </div>
+            {/if}
+
+            {#if auth.accountTotpFlow === "setting_up" && auth.totpSetup}
+              <div class="account-callout stack">
+                <p class="hint">{i18n.t("settings.account.totp.setupHint")}</p>
+                {#if accountTotpQrDataUrl}
+                  <img src={accountTotpQrDataUrl} alt={i18n.t("auth.register.qrAlt")} class="totp-qr" />
+                {/if}
+                <code class="totp-secret">{auth.totpSetup.secret}</code>
+                <input
+                  type="text"
+                  class="field-input"
+                  placeholder={i18n.t("settings.account.totp.codePlaceholder")}
+                  autocomplete="one-time-code"
+                  autocapitalize="none"
+                  autocorrect="off"
+                  spellcheck="false"
+                  inputmode="numeric"
+                  pattern="[0-9]*"
+                  bind:value={accountTotpCode}
+                  onkeydown={(event) => {
+                    if (event.key === "Enter" && accountTotpCode.trim()) {
+                      void handleAccountTotpSubmit();
+                    }
+                  }}
+                />
+                <div class="row account-callout-actions">
+                  <button
+                    class="action-btn"
+                    type="button"
+                    onclick={() => void handleAccountTotpSubmit()}
+                    disabled={auth.busy || !accountTotpCode.trim()}
+                  >
+                    {i18n.t(accountTotpSubmitKey)}
+                  </button>
+                  <button
+                    class="action-btn"
+                    type="button"
+                    onclick={() => {
+                      auth.cancelAccountTotpSetup();
+                      resetAccountTotpUi();
+                    }}
+                    disabled={auth.busy}
+                  >
+                    {i18n.t("common.cancel")}
+                  </button>
+                </div>
+              </div>
+            {/if}
+
+            {#if accountAuthCard.notice}
+              <p class="hint hint-success">{toMessageText(accountAuthCard.notice)}</p>
+            {/if}
+
+            {#if auth.errorText}
+              <p class="hint hint-error">{auth.errorText}</p>
+            {/if}
+          </div>
+
           <button class="action-btn danger" type="button" onclick={() => auth.signOut()}>
             {i18n.t("settings.button.signOut")}
           </button>
@@ -623,6 +828,16 @@
     font-size: var(--text-sm);
   }
 
+  .field-input {
+    padding: 0.55rem 0.62rem;
+    background: var(--cli-bg);
+    border: 1px solid var(--cli-border);
+    border-radius: var(--radius-md);
+    color: var(--cli-text);
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+  }
+
   .field select {
     padding: 0.55rem 0.62rem;
     background: var(--cli-bg);
@@ -634,13 +849,15 @@
   }
 
   .field input:focus,
-  .field select:focus {
+  .field select:focus,
+  .field-input:focus {
     outline: none;
     border-color: var(--cli-prefix-agent);
   }
 
   .field input:disabled,
-  .field select:disabled {
+  .field select:disabled,
+  .field-input:disabled {
     opacity: 0.6;
     background: var(--cli-bg-elevated);
   }
@@ -787,19 +1004,127 @@
     color: var(--cli-error);
   }
 
+  .hint-success {
+    color: var(--cli-success, #4ade80);
+  }
+
   .hint-local {
     color: var(--cli-success, #4ade80);
   }
 
-  .hint code {
-    color: var(--cli-text-dim);
-    background: var(--cli-bg-elevated);
-    padding: 1px 4px;
+  .account-card {
+    --stack-gap: var(--space-md);
+    padding: var(--space-md);
+    border: 1px solid color-mix(in srgb, var(--cli-border) 54%, transparent);
     border-radius: var(--radius-md);
-    font-family: var(--font-mono);
+    background: color-mix(in srgb, var(--cli-bg) 84%, var(--cli-bg-elevated));
   }
 
-  .hint a {
-    color: var(--cli-prefix-agent);
+  .account-card-header {
+    --stack-gap: var(--space-xs);
+  }
+
+  .account-card-title-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-sm);
+  }
+
+  .account-card-title-block {
+    --stack-gap: 0.25rem;
+  }
+
+  .account-card-title {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--cli-text-dim);
+    font-weight: 600;
+  }
+
+  .account-scope-hint {
+    max-width: 56ch;
+  }
+
+  .account-username {
+    padding: 0.24rem 0.5rem;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--cli-border) 54%, transparent);
+    color: var(--cli-text);
+    font-size: var(--text-xs);
+    line-height: 1.2;
+  }
+
+  .account-method-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+
+  .account-method-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-sm);
+    padding: 0.78rem 0.82rem;
+    border: 1px solid color-mix(in srgb, var(--cli-border) 46%, transparent);
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--cli-bg-elevated) 72%, transparent);
+  }
+
+  .account-method-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 0.16rem;
+    min-width: 0;
+  }
+
+  .account-method-label {
+    color: var(--cli-text);
+    font-size: 0.86rem;
+    font-weight: 600;
+  }
+
+  .account-method-status {
+    color: var(--cli-text-muted);
+    font-size: var(--text-xs);
+  }
+
+  .account-callout {
+    --stack-gap: 0.65rem;
+    padding: 0.82rem;
+    border-radius: var(--radius-md);
+    border: 1px solid color-mix(in srgb, var(--cli-border) 50%, transparent);
+    background: color-mix(in srgb, var(--cli-bg-elevated) 76%, transparent);
+  }
+
+  .account-callout-warning {
+    border-color: color-mix(in srgb, var(--cli-prefix-agent) 42%, var(--cli-border));
+    background: color-mix(in srgb, var(--cli-prefix-agent) 10%, var(--cli-bg-elevated));
+  }
+
+  .account-callout-actions {
+    gap: var(--space-sm);
+    flex-wrap: wrap;
+  }
+
+  .totp-qr {
+    width: 220px;
+    height: 220px;
+    max-width: 100%;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--cli-border);
+    background: white;
+  }
+
+  .totp-secret {
+    padding: 0.42rem 0.56rem;
+    border-radius: var(--radius-md);
+    border: 1px dashed var(--cli-border);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    user-select: all;
+    word-break: break-all;
   }
 </style>

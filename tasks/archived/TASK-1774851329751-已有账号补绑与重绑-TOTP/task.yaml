@@ -1,9 +1,9 @@
 id: TASK-1774851329751-已有账号补绑与重绑-TOTP
 title: 已有账号补绑与重绑 TOTP
-status: in_progress
-archived: false
+status: done
+archived: true
 created_at: '2026-03-30T06:15:29.751Z'
-updated_at: '2026-03-30T08:49:13.446Z'
+updated_at: '2026-03-30T10:05:13.149Z'
 related_repos: []
 depends_on: []
 blocked_by: []
