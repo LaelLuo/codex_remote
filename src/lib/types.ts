@@ -11,6 +11,7 @@ export interface ThreadInfo {
   createdAt?: number;
   updatedAt?: number;
   modelProvider?: string;
+  cwd?: string;
 }
 
 export type ApprovalPolicy = "on-request" | "never" | "on-failure" | "unless-trusted" | string;

@@ -318,6 +318,9 @@ class ThreadsStore {
         const loaded = pending.append
           ? this.#mergeThreads(this.#threadListLoaded, result.data ?? [])
           : [...(result.data ?? [])];
+        for (const thread of loaded) {
+          this.#syncProjectPath(thread.id, this.#resolveThreadCwd(thread));
+        }
         const visible = filterSessionsByQuery(loaded, pending.query);
         const shouldContinueSearch = pending.query.length > 0 && nextCursor !== null;
         const shouldKeepPrimaryLoading = pending.query.length > 0 && visible.length === 0 && shouldContinueSearch;
@@ -366,12 +369,14 @@ class ThreadsStore {
             reasoningEffort?: ReasoningEffort;
             approvalPolicy?: ApprovalPolicy | { kind?: string } | null;
             sandbox?: { type?: string } | string;
+            cwd?: string;
           };
           const thread = result.thread;
           if (thread?.id) {
             this.#openingThreadIds.delete(thread.id);
             const sandbox = resolveSandboxModeFromPolicy(result.sandbox);
             const approvalPolicy = this.#normalizeApprovalPolicy(result.approvalPolicy);
+            this.#syncProjectPath(thread.id, this.#resolveThreadCwd(thread, result.cwd));
             this.#hydratedThreadIds.add(thread.id);
             this.updateSettings(thread.id, {
               model: result.model ?? this.getSettings(thread.id).model,
@@ -409,11 +414,13 @@ class ThreadsStore {
           reasoningEffort?: ReasoningEffort;
           approvalPolicy?: ApprovalPolicy | { kind?: string } | null;
           sandbox?: { type?: string } | string;
+          cwd?: string;
         };
         const thread = result.thread;
         if (thread?.id) {
           const sandbox = resolveSandboxModeFromPolicy(result.sandbox);
           const approvalPolicy = this.#normalizeApprovalPolicy(result.approvalPolicy);
+          this.#syncProjectPath(thread.id, this.#resolveThreadCwd(thread, result.cwd));
           this.#hydratedThreadIds.add(thread.id);
           this.updateSettings(thread.id, {
             model: result.model ?? pending?.model ?? "",
@@ -433,6 +440,7 @@ class ThreadsStore {
   }
 
   #addThread(thread: ThreadInfo) {
+    this.#syncProjectPath(thread.id, this.#resolveThreadCwd(thread));
     if (this.list.some((t) => t.id === thread.id)) return;
     this.list = [thread, ...this.list];
   }
@@ -476,7 +484,7 @@ class ThreadsStore {
   #handleStartedThread(thread: ThreadInfo, pending: PendingStart | null) {
     this.#addThread(thread);
 
-    if (pending?.cwd?.trim()) {
+    if (!this.getProjectPath(thread.id) && pending?.cwd?.trim()) {
       this.setProjectPath(thread.id, pending.cwd.trim());
     }
 
@@ -691,6 +699,20 @@ class ThreadsStore {
   #messageToFallbackText(message: ThreadStartMessage): string {
     if (message.kind === "text") return message.text;
     return message.key;
+  }
+
+  #resolveThreadCwd(thread?: ThreadInfo | null, explicitCwd?: string | null): string {
+    const threadCwd = typeof thread?.cwd === "string" ? thread.cwd.trim() : "";
+    if (threadCwd) return threadCwd;
+    const normalizedExplicit = explicitCwd?.trim() ?? "";
+    return normalizedExplicit;
+  }
+
+  #syncProjectPath(threadId: string, cwd: string) {
+    const normalizedThreadId = threadId.trim();
+    const normalizedCwd = cwd.trim();
+    if (!normalizedThreadId || !normalizedCwd) return;
+    this.setProjectPath(normalizedThreadId, normalizedCwd);
   }
 
   #loadSettings() {

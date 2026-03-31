@@ -362,6 +362,31 @@ describe("threads default settings", () => {
     expect(threads.isHydrated("thread-1")).toBe(true);
   });
 
+  test("hydrates project path from thread resume responses", async () => {
+    anchorsMock.list = [{ id: "anchor-1" }];
+    anchorsMock.selectedId = "anchor-1";
+    anchorsMock.selected = { id: "anchor-1" };
+
+    const { threads } = await loadFreshThreadsModule();
+
+    threads.open("thread-1");
+
+    const resumeRequest = socketSendMock.mock.calls[0]?.[0] as { id: number } | undefined;
+    threads.handleMessage({
+      id: resumeRequest!.id,
+      result: {
+        thread: { id: "thread-1", cwd: "D:/repos/app" },
+        cwd: "D:/repos/app",
+        model: "gpt-test",
+        reasoningEffort: "medium",
+        approvalPolicy: "never",
+        sandbox: { type: "dangerFullAccess" },
+      },
+    });
+
+    expect(threads.getProjectPath("thread-1")).toBe("D:/repos/app");
+  });
+
   test("maps external sandbox resume responses to danger-full-access", async () => {
     anchorsMock.list = [{ id: "anchor-1" }];
     anchorsMock.selectedId = "anchor-1";
@@ -473,6 +498,31 @@ describe("threads default settings", () => {
       sandbox: "workspace-write",
     });
   });
+
+  test("prefers server cwd over pending start cwd", async () => {
+    anchorsMock.list = [{ id: "anchor-1" }];
+    anchorsMock.selectedId = "anchor-1";
+    anchorsMock.selected = { id: "anchor-1" };
+
+    const { threads } = await loadFreshThreadsModule();
+
+    threads.start("C:/temp/repo", "task");
+
+    const startRequest = socketSendMock.mock.calls[0]?.[0] as { id: number } | undefined;
+    threads.handleMessage({
+      id: startRequest!.id,
+      result: {
+        thread: { id: "thread-1", cwd: "D:/repos/actual" },
+        cwd: "D:/repos/actual",
+        model: "gpt-test",
+        reasoningEffort: "medium",
+        approvalPolicy: "never",
+        sandbox: { type: "dangerFullAccess" },
+      },
+    });
+
+    expect(threads.getProjectPath("thread-1")).toBe("D:/repos/actual");
+  });
 });
 
 describe("threads list pagination", () => {
@@ -511,6 +561,35 @@ describe("threads list pagination", () => {
     expect(threads.loadingMore).toBe(false);
     expect(threads.hasMore).toBe(false);
     expect(threads.list).toEqual([{ id: "thread-1", preview: "needle result", createdAt: 300, updatedAt: 400 }]);
+  });
+
+  test("hydrates project path from thread list metadata cwd", async () => {
+    const { threads } = await loadFreshThreadsModule();
+
+    threads.fetchSessions({ reset: true, query: "", sort: "updated" });
+
+    const firstRequest = socketSendMock.mock.calls[0]?.[0] as { id: number } | undefined;
+    threads.handleMessage({
+      id: firstRequest!.id,
+      result: {
+        data: [
+          {
+            id: "thread-1",
+            preview: "repo session",
+            createdAt: 300,
+            updatedAt: 400,
+            cwd: "D:/repos/listed",
+          },
+        ],
+        nextCursor: null,
+      },
+    });
+
+    expect(threads.list[0]).toMatchObject({
+      id: "thread-1",
+      cwd: "D:/repos/listed",
+    });
+    expect(threads.getProjectPath("thread-1")).toBe("D:/repos/listed");
   });
 
   test("fetchNextSessions appends the next page from nextCursor", async () => {
