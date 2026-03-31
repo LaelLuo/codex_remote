@@ -34,10 +34,10 @@
 
 <svelte:window onclick={handleWindowClick} />
 
-<div class="sandbox-picker" class:open>
+<div class="dropdown sandbox-picker" class:open>
   <button
     type="button"
-    class="sandbox-btn row"
+    class="tool-btn row sandbox-btn"
     class:danger={sandbox === "danger-full-access"}
     {disabled}
     onclick={(event) => {
@@ -56,11 +56,11 @@
   </button>
 
   {#if open}
-    <div class="sandbox-menu">
+    <div class="dropdown-menu sandbox-menu">
       {#each sandboxOptions as option}
         <button
           type="button"
-          class="sandbox-item split"
+          class="dropdown-item split sandbox-item"
           class:selected={sandbox === option}
           class:danger={option === "danger-full-access"}
           onclick={() => {

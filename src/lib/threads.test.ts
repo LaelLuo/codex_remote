@@ -361,6 +361,118 @@ describe("threads default settings", () => {
     });
     expect(threads.isHydrated("thread-1")).toBe(true);
   });
+
+  test("maps external sandbox resume responses to danger-full-access", async () => {
+    anchorsMock.list = [{ id: "anchor-1" }];
+    anchorsMock.selectedId = "anchor-1";
+    anchorsMock.selected = { id: "anchor-1" };
+
+    const { threads } = await loadFreshThreadsModule();
+
+    threads.open("thread-1");
+
+    const resumeRequest = socketSendMock.mock.calls[0]?.[0] as { id: number } | undefined;
+    threads.handleMessage({
+      id: resumeRequest!.id,
+      result: {
+        thread: { id: "thread-1" },
+        model: "gpt-test",
+        reasoningEffort: "medium",
+        approvalPolicy: "never",
+        sandbox: { type: "externalSandbox", networkAccess: "enabled" },
+      },
+    });
+
+    expect(threads.getSettings("thread-1")).toMatchObject({
+      approvalPolicy: "never",
+      sandbox: "danger-full-access",
+    });
+  });
+
+  test("preserves locally changed sandbox when resume returns stale server settings", async () => {
+    anchorsMock.list = [{ id: "anchor-1" }];
+    anchorsMock.selectedId = "anchor-1";
+    anchorsMock.selected = { id: "anchor-1" };
+
+    const { threads } = await loadFreshThreadsModule();
+
+    threads.updateSettings("thread-1", {
+      sandbox: "danger-full-access",
+      approvalPolicy: "never",
+    });
+
+    threads.open("thread-1");
+
+    const resumeRequest = socketSendMock.mock.calls[0]?.[0] as { id: number } | undefined;
+    threads.handleMessage({
+      id: resumeRequest!.id,
+      result: {
+        thread: { id: "thread-1" },
+        model: "gpt-test",
+        reasoningEffort: "medium",
+        approvalPolicy: "on-request",
+        sandbox: { type: "workspaceWrite", writableRoots: [], networkAccess: false },
+      },
+    });
+
+    expect(threads.getSettings("thread-1")).toMatchObject({
+      approvalPolicy: "never",
+      sandbox: "danger-full-access",
+    });
+  });
+
+  test("preserves locally changed sandbox across store reloads before server catches up", async () => {
+    anchorsMock.list = [{ id: "anchor-1" }];
+    anchorsMock.selectedId = "anchor-1";
+    anchorsMock.selected = { id: "anchor-1" };
+
+    {
+      const { threads } = await loadFreshThreadsModule();
+      threads.updateSettings("thread-1", {
+        sandbox: "danger-full-access",
+        approvalPolicy: "never",
+      });
+    }
+
+    const { threads } = await loadFreshThreadsModule();
+
+    threads.open("thread-1");
+
+    const resumeRequest = socketSendMock.mock.calls[0]?.[0] as { id: number } | undefined;
+    threads.handleMessage({
+      id: resumeRequest!.id,
+      result: {
+        thread: { id: "thread-1" },
+        model: "gpt-test",
+        reasoningEffort: "medium",
+        approvalPolicy: "on-request",
+        sandbox: { type: "workspaceWrite", writableRoots: [], networkAccess: false },
+      },
+    });
+
+    expect(threads.getSettings("thread-1")).toMatchObject({
+      approvalPolicy: "never",
+      sandbox: "danger-full-access",
+    });
+  });
+
+  test("clears persisted dirty settings when a thread is archived", async () => {
+    const { threads } = await loadFreshThreadsModule();
+
+    threads.updateSettings("thread-1", {
+      sandbox: "danger-full-access",
+      approvalPolicy: "never",
+    });
+
+    threads.archive("thread-1");
+
+    const { threads: reloadedThreads } = await loadFreshThreadsModule();
+
+    expect(reloadedThreads.getSettings("thread-1")).toMatchObject({
+      approvalPolicy: "on-request",
+      sandbox: "workspace-write",
+    });
+  });
 });
 
 describe("threads list pagination", () => {

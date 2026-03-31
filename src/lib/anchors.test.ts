@@ -174,4 +174,53 @@ describe("anchors timeout reconciliation", () => {
     expect(anchors.selectedId).toBe("anchor-2");
     expect(storage.getItem(SELECTED_STORAGE_KEY)).toBe("anchor-2");
   });
+
+  test("notifies selection listeners when the same selected anchor comes back online", async () => {
+    const protocolHandlers: Array<(msg: Record<string, unknown>) => void> = [];
+    const socket = {
+      isHealthy: true,
+      requestAnchors: vi.fn(),
+      onConnect(_handler: () => void) {
+        return () => {};
+      },
+      onProtocol(handler: (msg: Record<string, unknown>) => void) {
+        protocolHandlers.push(handler);
+        return () => {};
+      },
+    };
+
+    const storage = createLocalStorage();
+    storage.setItem(SELECTED_STORAGE_KEY, "anchor-1");
+    Object.defineProperty(globalThis, "window", { value: {}, configurable: true, writable: true });
+    Object.defineProperty(globalThis, "localStorage", { value: storage, configurable: true, writable: true });
+    Object.defineProperty(globalThis, "$state", { value: <T>(value: T) => value, configurable: true, writable: true });
+
+    resetAnchorsStoreSingleton();
+    mock.module("./socket.svelte", () => ({
+      socket,
+      getSocketErrorMessage: () => null,
+    }));
+    const { anchors } = await importFreshAnchors();
+
+    const notifications: Array<string | null> = [];
+    anchors.onSelectionChange((anchorId) => {
+      notifications.push(anchorId);
+    });
+
+    expect(notifications).toEqual(["anchor-1"]);
+
+    protocolHandlers[0]({
+      type: "orbit.anchor-connected",
+      anchor: {
+        id: "anchor-1",
+        hostname: "desktop",
+        platform: "linux",
+        connectedAt: "2026-01-01T00:02:00.000Z",
+      },
+    });
+
+    expect(notifications).toEqual(["anchor-1", "anchor-1"]);
+    expect(anchors.selectedId).toBe("anchor-1");
+    expect(anchors.selected?.id).toBe("anchor-1");
+  });
 });

@@ -24,7 +24,7 @@ class ModelsStore {
 
   #requestId: number | null = null;
   #requestTimeout: ReturnType<typeof setTimeout> | null = null;
-  #lastAnchorId: string | null = null;
+  #lastSelectionSignature: string | null = null;
 
   constructor() {
     socket.onMessage((msg) => this.#handleMessage(msg));
@@ -33,9 +33,9 @@ class ModelsStore {
       this.refresh();
     });
     anchors.onSelectionChange((anchorId) => {
-      const nextAnchorId = auth.isLocalMode ? null : anchorId;
-      if (this.#lastAnchorId === nextAnchorId) return;
-      this.#lastAnchorId = nextAnchorId;
+      const nextSignature = this.#selectionSignature(anchorId);
+      if (this.#lastSelectionSignature === nextSignature) return;
+      this.#lastSelectionSignature = nextSignature;
       this.refresh();
     });
   }
@@ -61,6 +61,11 @@ class ModelsStore {
       preferredModel: this.configDefaults.model,
       preferredReasoningEffort: this.configDefaults.reasoningEffort,
     });
+  }
+
+  #selectionSignature(anchorId: string | null): string {
+    if (auth.isLocalMode) return "local";
+    return `${anchorId ?? ""}|${anchors.selected ? "online" : "offline"}`;
   }
 
   #send() {

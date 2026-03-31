@@ -5,12 +5,21 @@ import { models } from "./models.svelte";
 import { anchors } from "./anchors.svelte";
 import { auth } from "./auth.svelte";
 import { filterSessionsByQuery } from "./session-search";
+import { resolveSandboxModeFromPolicy } from "./thread-permissions";
 import { buildTurnStartOverrides } from "./thread-turn";
 import { navigate } from "../router";
 
 const STORE_KEY = "__codex_remote_threads_store__";
 const SETTINGS_STORAGE_KEY = "codex_remote_thread_settings";
+const DIRTY_SETTINGS_STORAGE_KEY = "codex_remote_thread_dirty_settings";
 const PROJECTS_STORAGE_KEY = "codex_remote_thread_projects";
+const DIRTY_SETTING_KEYS: Array<keyof ThreadSettings> = [
+  "model",
+  "reasoningEffort",
+  "approvalPolicy",
+  "sandbox",
+  "mode",
+];
 
 function createDefaultSettings(): ThreadSettings {
   const defaultModel = models.defaultModel?.value ?? "";
@@ -74,6 +83,7 @@ class ThreadsStore {
 
   #settings = $state<Map<string, ThreadSettings>>(new Map());
   #projectByThread = $state<Map<string, string>>(new Map());
+  #dirtySettingKeys = new Map<string, Set<keyof ThreadSettings>>();
   #hydratedThreadIds = new Set<string>();
   #openingThreadIds = new Set<string>();
   #nextId = 1;
@@ -89,6 +99,7 @@ class ThreadsStore {
 
   constructor() {
     this.#loadSettings();
+    this.#loadDirtySettingKeys();
     this.#loadProjectPaths();
   }
 
@@ -98,9 +109,15 @@ class ThreadsStore {
     return settings ? { ...settings } : createDefaultSettings();
   }
 
-  updateSettings(threadId: string, update: Partial<ThreadSettings>) {
+  updateSettings(
+    threadId: string,
+    update: Partial<ThreadSettings>,
+    source: "local" | "remote" = "local",
+  ) {
     const current = this.#settings.get(threadId) ?? createDefaultSettings();
-    const next: ThreadSettings = { ...current, ...update };
+    const effectiveUpdate =
+      source === "remote" ? this.#filterRemoteSettingsUpdate(threadId, current, update) : update;
+    const next: ThreadSettings = { ...current, ...effectiveUpdate };
     if (
       current.model === next.model &&
       current.reasoningEffort === next.reasoningEffort &&
@@ -108,9 +125,15 @@ class ThreadsStore {
       current.sandbox === next.sandbox &&
       current.mode === next.mode
     ) {
+      if (source === "local") {
+        this.#markDirtySettingKeys(threadId, current, update);
+      }
       return;
     }
     this.#settings = new Map(this.#settings).set(threadId, next);
+    if (source === "local") {
+      this.#markDirtySettingKeys(threadId, current, update);
+    }
     this.#saveSettings();
   }
 
@@ -255,6 +278,10 @@ class ThreadsStore {
       this.#settings = next;
       this.#saveSettings();
     }
+    if (this.#dirtySettingKeys.has(threadId)) {
+      this.#dirtySettingKeys.delete(threadId);
+      this.#saveDirtySettingKeys();
+    }
     this.#hydratedThreadIds.delete(threadId);
     if (this.#projectByThread.has(threadId)) {
       const next = new Map(this.#projectByThread);
@@ -343,7 +370,7 @@ class ThreadsStore {
           const thread = result.thread;
           if (thread?.id) {
             this.#openingThreadIds.delete(thread.id);
-            const sandbox = this.#normalizeSandbox(result.sandbox);
+            const sandbox = resolveSandboxModeFromPolicy(result.sandbox);
             const approvalPolicy = this.#normalizeApprovalPolicy(result.approvalPolicy);
             this.#hydratedThreadIds.add(thread.id);
             this.updateSettings(thread.id, {
@@ -353,7 +380,7 @@ class ThreadsStore {
                 models.resolveDefaultReasoningEffort(result.model ?? this.getSettings(thread.id).model ?? null),
               ...(approvalPolicy ? { approvalPolicy } : {}),
               ...(sandbox ? { sandbox } : {}),
-            });
+            }, "remote");
           }
         }
         if (msg.error && this.currentId) {
@@ -385,7 +412,7 @@ class ThreadsStore {
         };
         const thread = result.thread;
         if (thread?.id) {
-          const sandbox = this.#normalizeSandbox(result.sandbox);
+          const sandbox = resolveSandboxModeFromPolicy(result.sandbox);
           const approvalPolicy = this.#normalizeApprovalPolicy(result.approvalPolicy);
           this.#hydratedThreadIds.add(thread.id);
           this.updateSettings(thread.id, {
@@ -396,7 +423,7 @@ class ThreadsStore {
             approvalPolicy: approvalPolicy ?? pending?.approvalPolicy ?? "on-request",
             ...(sandbox ? { sandbox } : {}),
             ...(!sandbox && pending?.sandbox ? { sandbox: pending.sandbox } : {}),
-          });
+          }, "remote");
 
           socket.subscribeThread(thread.id);
           this.#handleStartedThread(thread, pending);
@@ -490,27 +517,53 @@ class ThreadsStore {
     return null;
   }
 
-  #normalizeSandbox(input: unknown): SandboxMode | null {
-    if (!input) return null;
-    if (typeof input === "string") {
-      if (input === "read-only" || input === "workspace-write" || input === "danger-full-access") {
-        return input;
+  #filterRemoteSettingsUpdate(
+    threadId: string,
+    current: ThreadSettings,
+    update: Partial<ThreadSettings>,
+  ): Partial<ThreadSettings> {
+    const dirtyKeys = this.#dirtySettingKeys.get(threadId);
+    if (!dirtyKeys || dirtyKeys.size === 0) return update;
+
+    const filtered: Partial<ThreadSettings> = { ...update };
+    const remainingDirty = new Set(dirtyKeys);
+    for (const key of dirtyKeys) {
+      const incoming = filtered[key];
+      if (incoming === undefined) continue;
+      if (current[key] === incoming) {
+        remainingDirty.delete(key);
+        continue;
       }
-      const lower = input.toLowerCase();
-      if (lower.includes("readonly")) return "read-only";
-      if (lower.includes("workspace")) return "workspace-write";
-      if (lower.includes("danger") || lower.includes("full")) return "danger-full-access";
-      return null;
+      delete filtered[key];
     }
-    if (typeof input === "object") {
-      const type = (input as { type?: string }).type;
-      if (!type) return null;
-      if (type === "readOnly") return "read-only";
-      if (type === "workspaceWrite") return "workspace-write";
-      if (type === "dangerFullAccess") return "danger-full-access";
-      return this.#normalizeSandbox(type);
+    this.#setDirtySettingKeys(threadId, remainingDirty);
+    return filtered;
+  }
+
+  #markDirtySettingKeys(
+    threadId: string,
+    current: ThreadSettings,
+    update: Partial<ThreadSettings>,
+  ) {
+    const nextDirty = new Set(this.#dirtySettingKeys.get(threadId) ?? []);
+    for (const key of DIRTY_SETTING_KEYS) {
+      const value = update[key];
+      if (value === undefined) continue;
+      if (current[key] !== value) {
+        nextDirty.add(key);
+      }
     }
-    return null;
+    this.#setDirtySettingKeys(threadId, nextDirty);
+  }
+
+  #setDirtySettingKeys(threadId: string, keys: Set<keyof ThreadSettings>) {
+    if (keys.size === 0) {
+      this.#dirtySettingKeys.delete(threadId);
+      this.#saveDirtySettingKeys();
+      return;
+    }
+    this.#dirtySettingKeys.set(threadId, keys);
+    this.#saveDirtySettingKeys();
   }
 
   #startThread(
@@ -533,7 +586,7 @@ class ThreadsStore {
         input: input?.trim() ? input.trim() : null,
         model: this.#resolveStartModel(options?.collaborationMode),
         approvalPolicy: this.#normalizeApprovalPolicy(options?.approvalPolicy),
-        sandbox: this.#normalizeSandbox(options?.sandbox),
+        sandbox: resolveSandboxModeFromPolicy(options?.sandbox),
         collaborationMode: options?.collaborationMode ?? null,
         suppressNavigation: options?.suppressNavigation ?? false,
         onThreadStarted: options?.onThreadStarted ?? null,
@@ -550,7 +603,7 @@ class ThreadsStore {
       input: input?.trim() ? input.trim() : null,
       model: requestedModel,
       approvalPolicy: this.#normalizeApprovalPolicy(options?.approvalPolicy),
-      sandbox: this.#normalizeSandbox(options?.sandbox),
+      sandbox: resolveSandboxModeFromPolicy(options?.sandbox),
       collaborationMode: options?.collaborationMode ?? null,
       suppressNavigation: options?.suppressNavigation ?? false,
       onThreadStarted: options?.onThreadStarted ?? null,
@@ -663,6 +716,39 @@ class ThreadsStore {
         data[threadId] = settings;
       }
       localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(data));
+    } catch {
+      // ignore
+    }
+  }
+
+  #loadDirtySettingKeys() {
+    try {
+      const saved = localStorage.getItem(DIRTY_SETTINGS_STORAGE_KEY);
+      if (!saved) return;
+      const data = JSON.parse(saved) as Record<string, unknown>;
+      const next = new Map<string, Set<keyof ThreadSettings>>();
+      for (const [threadId, keys] of Object.entries(data)) {
+        if (!threadId || !Array.isArray(keys)) continue;
+        const validKeys = keys.filter((key): key is keyof ThreadSettings => {
+          return typeof key === "string" && DIRTY_SETTING_KEYS.includes(key as keyof ThreadSettings);
+        });
+        if (validKeys.length === 0) continue;
+        next.set(threadId, new Set(validKeys));
+      }
+      this.#dirtySettingKeys = next;
+    } catch {
+      // ignore
+    }
+  }
+
+  #saveDirtySettingKeys() {
+    try {
+      const data: Record<string, Array<keyof ThreadSettings>> = {};
+      for (const [threadId, keys] of this.#dirtySettingKeys) {
+        if (keys.size === 0) continue;
+        data[threadId] = [...keys];
+      }
+      localStorage.setItem(DIRTY_SETTINGS_STORAGE_KEY, JSON.stringify(data));
     } catch {
       // ignore
     }

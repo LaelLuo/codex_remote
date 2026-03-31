@@ -19,6 +19,7 @@ class AnchorsStore {
   selectedId = $state<string | null>(null);
   #checkTimeout: ReturnType<typeof setTimeout> | null = null;
   #selectionHandlers = new Set<(anchorId: string | null) => void>();
+  #lastSelectionSnapshot: string | null = null;
 
   constructor() {
     if (typeof window === "undefined") return;
@@ -40,6 +41,7 @@ class AnchorsStore {
         this.list = (msg.anchors as AnchorInfo[]) ?? [];
         this.status = this.list.length ? "connected" : "none";
         this.#reconcileSelection();
+        this.#notifySelectionChange();
         this.#clearTimeout();
       } else if (msg.type === "orbit.anchor-connected") {
         const anchor = msg.anchor as AnchorInfo;
@@ -48,11 +50,13 @@ class AnchorsStore {
         }
         this.status = "connected";
         this.#reconcileSelection();
+        this.#notifySelectionChange();
         this.#clearTimeout();
       } else if (msg.type === "orbit.anchor-disconnected") {
         this.list = this.list.filter((a) => a.id !== (msg.anchorId as string));
         this.status = this.list.length ? "connected" : "none";
         this.#reconcileSelection();
+        this.#notifySelectionChange();
       }
     });
   }
@@ -90,6 +94,7 @@ class AnchorsStore {
       this.list = [];
       this.status = "none";
       this.#reconcileSelection();
+      this.#notifySelectionChange();
     }, ANCHOR_CHECK_TIMEOUT_MS);
   }
 
@@ -137,6 +142,9 @@ class AnchorsStore {
   }
 
   #notifySelectionChange() {
+    const snapshot = `${this.selectedId ?? ""}|${this.selected ? "online" : "offline"}`;
+    if (snapshot === this.#lastSelectionSnapshot) return;
+    this.#lastSelectionSnapshot = snapshot;
     for (const handler of this.#selectionHandlers) {
       handler(this.selectedId);
     }

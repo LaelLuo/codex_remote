@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { buildThreadPermissionSettings, resolveApprovalPolicyForSandbox } from "./thread-permissions";
+import {
+  buildThreadPermissionSettings,
+  resolveApprovalPolicyForSandbox,
+  resolveSandboxModeFromPolicy,
+} from "./thread-permissions";
 
 describe("thread permission settings", () => {
   test("maps read-only and workspace-write sandboxes to on-request approval", () => {
@@ -12,5 +16,27 @@ describe("thread permission settings", () => {
       sandbox: "danger-full-access",
       approvalPolicy: "never",
     });
+  });
+
+  test("maps external sandbox policy to danger-full-access for UI display", () => {
+    expect(
+      resolveSandboxModeFromPolicy({
+        type: "externalSandbox",
+        networkAccess: "enabled",
+      }),
+    ).toBe("danger-full-access");
+  });
+
+  test("maps workspace-write sandbox policies with extra fields to workspace-write", () => {
+    expect(
+      resolveSandboxModeFromPolicy({
+        type: "workspaceWrite",
+        writableRoots: [],
+        readOnlyAccess: { type: "fullAccess" },
+        networkAccess: false,
+        excludeTmpdirEnvVar: false,
+        excludeSlashTmp: false,
+      }),
+    ).toBe("workspace-write");
   });
 });
