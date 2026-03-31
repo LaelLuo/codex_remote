@@ -29,6 +29,7 @@ credentials.json
 **/.wrangler/
 __pycache__/
 *.pyc
+**/.venv/
 services/control-plane/data/
 
 # misc

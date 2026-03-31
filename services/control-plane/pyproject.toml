@@ -1,0 +1,20 @@
+[project]
+name = "codex-remote-control-plane"
+version = "0.1.0"
+description = "FastAPI control plane for Codex Remote"
+requires-python = ">=3.10"
+dependencies = [
+  "fastapi==0.116.1",
+  "uvicorn[standard]==0.35.0",
+  "PyJWT==2.10.1",
+  "webauthn==2.7.0",
+]
+
+[dependency-groups]
+dev = [
+  "httpx>=0.28,<0.29",
+  "pytest>=8.4,<9",
+]
+
+[tool.uv]
+default-groups = ["dev"]
